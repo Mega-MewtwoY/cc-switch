@@ -107,6 +107,11 @@ cd src-tauri && cargo check && cargo test
   `UsageScriptModal.tsx` `getProviderCredentials` 的 kimicode
   分支互为镜像，都读 `settings_config.provider.{base_url,api_key}`，
   改动须两边同步（漏前端会导致测试报 Unknown coding plan provider）。
+  OAuth 令牌：官方供应商 `provider.api_key` 为空，令牌由 kimi CLI
+  存在 `<kimi_dir>/credentials/kimi-code.json`；
+  `kimicode_config::load_oauth_access_token` 读取，
+  `coding_plan::get_coding_plan_quota` 的 Kimi 分支在 api_key
+  为空时回退到该令牌（前端测试与后台轮询共用此路径）。
   kimi 的 `inputOther` 是 fresh input（Anthropic 风格），
   **不要**加入 `CACHE_INCLUSIVE_APP_TYPES`。
 - **会话**：`session_manager/mod.rs` 的 scan 线程组（8 元组）、

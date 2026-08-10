@@ -51,6 +51,26 @@ pub fn get_kimicode_config_path() -> PathBuf {
     get_kimicode_dir().join("config.toml")
 }
 
+/// 读取 kimi CLI 管理的 OAuth access_token
+/// （<kimi_dir>/credentials/kimi-code.json）。
+///
+/// 官方供应商的 config.toml 里 `api_key` 为空——OAuth 令牌由 kimi CLI
+/// 自己持有并刷新，CC Switch 只在需要直接调官方 API（如套餐用量查询）时
+/// 从这里借用。文件缺失/损坏/令牌为空时返回 None，由调用方给出引导文案。
+pub fn load_oauth_access_token() -> Option<String> {
+    load_oauth_access_token_from(&get_kimicode_dir().join("credentials").join("kimi-code.json"))
+}
+
+fn load_oauth_access_token_from(path: &Path) -> Option<String> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&content).ok()?;
+    value
+        .get("access_token")?
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+}
+
 /// 读取 config.toml 为可编辑文档；文件不存在时返回空文档。
 ///
 /// TOML 解析失败会报错而不是重建：config.toml 里还有 thinking/services
@@ -564,5 +584,36 @@ enabled = true
             read_kimicode_config().is_err(),
             "损坏的 TOML 必须报错而不是静默重建"
         );
+    }
+
+    #[test]
+    fn load_oauth_access_token_reads_credentials_file() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let path = temp.path().join("kimi-code.json");
+        std::fs::write(
+            &path,
+            r#"{"access_token":"tok-abc","refresh_token":"tok-refresh","expires_at":1893456000}"#,
+        )
+        .expect("write credentials");
+
+        assert_eq!(
+            load_oauth_access_token_from(&path).as_deref(),
+            Some("tok-abc")
+        );
+    }
+
+    #[test]
+    fn load_oauth_access_token_returns_none_when_unusable() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let missing = temp.path().join("missing.json");
+        assert_eq!(load_oauth_access_token_from(&missing), None);
+
+        let empty_token = temp.path().join("empty.json");
+        std::fs::write(&empty_token, r#"{"access_token":""}"#).expect("write");
+        assert_eq!(load_oauth_access_token_from(&empty_token), None);
+
+        let invalid = temp.path().join("invalid.json");
+        std::fs::write(&invalid, "not json").expect("write");
+        assert_eq!(load_oauth_access_token_from(&invalid), None);
     }
 }

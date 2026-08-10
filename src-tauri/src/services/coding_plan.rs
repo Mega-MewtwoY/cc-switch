@@ -1313,6 +1313,26 @@ pub async fn get_coding_plan_quota(
         return query_volcengine(base_url, ak, sk).await;
     }
 
+    // Kimi 官方 OAuth 供应商：settings_config 里 api_key 为空，令牌由 kimi CLI
+    // 存在 ~/.kimi-code/credentials/kimi-code.json。空 key 时回退读取本地令牌，
+    // 让官方供应商的套餐用量查询开箱即用（与前端测试、后台轮询两条路径共用此处）。
+    let kimi_oauth_token;
+    let api_key = if matches!(provider, CodingPlanProvider::Kimi) && api_key.trim().is_empty() {
+        match crate::kimicode_config::load_oauth_access_token() {
+            Some(token) => {
+                kimi_oauth_token = token;
+                &kimi_oauth_token
+            }
+            None => {
+                return Ok(coding_plan_not_found(
+                    "Kimi OAuth credential not found; log in via the kimi CLI first",
+                ));
+            }
+        }
+    } else {
+        api_key
+    };
+
     // 其余供应商：数据面 Bearer api_key。
     // 与 balance::get_balance 一致：给出明确错误，避免 footer 显示无信息的失败
     if api_key.trim().is_empty() {
