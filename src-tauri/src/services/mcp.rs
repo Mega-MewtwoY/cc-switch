@@ -46,6 +46,9 @@ impl McpService {
         if prev_apps.hermes && !server.apps.hermes {
             Self::remove_server_from_app(state, &server.id, &AppType::Hermes)?;
         }
+        if prev_apps.kimicode && !server.apps.kimicode {
+            Self::remove_server_from_app(state, &server.id, &AppType::KimiCode)?;
+        }
 
         // 同步到各个启用的应用
         Self::sync_server_to_apps(state, &server)?;
@@ -146,8 +149,11 @@ impl McpService {
                 mcp::sync_single_server_to_hermes(&Default::default(), &server.id, &server.server)?;
             }
             AppType::KimiCode => {
-                // Kimi Code MCP sync is not implemented yet (Phase 1: providers only)
-                log::debug!("KimiCode MCP support is not implemented yet, skipping sync");
+                mcp::sync_single_server_to_kimicode(
+                    &Default::default(),
+                    &server.id,
+                    &server.server,
+                )?;
             }
         }
         Ok(())
@@ -186,8 +192,7 @@ impl McpService {
                 mcp::remove_server_from_hermes(id)?;
             }
             AppType::KimiCode => {
-                // Kimi Code MCP sync is not implemented yet (Phase 1: providers only)
-                log::debug!("KimiCode MCP support is not implemented yet, skipping remove");
+                mcp::remove_server_from_kimicode(id)?;
             }
         }
         Ok(())
@@ -512,8 +517,41 @@ impl McpService {
         Ok(new_count)
     }
 
+    /// 从 Kimi Code 导入 MCP（~/.kimi-code/mcp.json）
+    pub fn import_from_kimicode(state: &AppState) -> Result<usize, AppError> {
+        let mut temp_config = crate::app_config::MultiAppConfig::default();
+
+        let count = crate::mcp::import_from_kimicode(&mut temp_config)?;
+
+        let mut new_count = 0;
+
+        if count > 0 {
+            if let Some(servers) = &temp_config.mcp.servers {
+                let mut existing = state.db.get_all_mcp_servers()?;
+                for server in servers.values() {
+                    // 已存在：仅启用 KimiCode，不覆盖其他字段（与导入模块语义保持一致）
+                    let to_save = if let Some(existing_server) = existing.get(&server.id) {
+                        let mut merged = existing_server.clone();
+                        merged.apps.kimicode = true;
+                        merged
+                    } else {
+                        // 真正的新服务器
+                        new_count += 1;
+                        server.clone()
+                    };
+
+                    state.db.save_mcp_server(&to_save)?;
+                    existing.insert(to_save.id.clone(), to_save.clone());
+
+                    // 导入是读取已有配置，不应反向写回任何应用的 live 配置。
+                }
+            }
+        }
+
+        Ok(new_count)
+    }
+
     /// 从所有支持 MCP 的应用导入服务器，返回新导入的数量。
-    ///
     /// Best-effort：单个应用导入失败（如坏 config.toml）不阻断其余应用；
     /// 全部跑完后若有失败，聚合成一个错误上报——历史实现逐应用
     /// `unwrap_or(0)` 吞错，坏文件只会表现为"导入成功 0 个"，用户
@@ -522,13 +560,14 @@ impl McpService {
         let mut total = 0;
         let mut failures: Vec<String> = Vec::new();
 
-        let results: [(&str, Result<usize, AppError>); 6] = [
+        let results: [(&str, Result<usize, AppError>); 7] = [
             ("claude", Self::import_from_claude(state)),
             ("codex", Self::import_from_codex(state)),
             ("gemini", Self::import_from_gemini(state)),
             ("grokbuild", Self::import_from_grokbuild(state)),
             ("opencode", Self::import_from_opencode(state)),
             ("hermes", Self::import_from_hermes(state)),
+            ("kimicode", Self::import_from_kimicode(state)),
         ];
         for (app, result) in results {
             match result {

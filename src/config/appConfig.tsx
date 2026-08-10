@@ -35,6 +35,7 @@ export const SKILLS_APP_IDS: AppId[] = [
   "grokbuild",
   "opencode",
   "hermes",
+  "kimicode",
 ];
 
 /** App IDs shown in MCP panels (excludes OpenClaw) */

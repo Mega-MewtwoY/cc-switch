@@ -1818,7 +1818,8 @@
         "grokbuild": "Grok Build",
         "opencode": "OpenCode",
         "openclaw": "OpenClaw",
-        "hermes": "Hermes"
+        "hermes": "Hermes",
+        "kimicode": "Kimi Code"
       }
     },
     "userLevelPath": "User-level MCP path",

@@ -18,6 +18,7 @@ mod grok_config;
 pub mod hermes_config;
 mod init_status;
 pub mod kimicode_config;
+mod kimicode_mcp;
 mod lightweight;
 #[cfg(target_os = "linux")]
 mod linux_fix;

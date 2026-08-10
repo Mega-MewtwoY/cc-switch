@@ -1020,6 +1020,7 @@ const ImportSkillsDialog: React.FC<ImportSkillsDialogProps> = ({
           opencode: skill.foundIn.includes("opencode"),
           openclaw: false,
           hermes: skill.foundIn.includes("hermes"),
+          kimicode: skill.foundIn.includes("kimicode"),
         },
       ]),
     ),
@@ -1047,6 +1048,7 @@ const ImportSkillsDialog: React.FC<ImportSkillsDialogProps> = ({
           opencode: false,
           openclaw: false,
           hermes: false,
+          kimicode: false,
         },
       })),
     );
@@ -1091,6 +1093,7 @@ const ImportSkillsDialog: React.FC<ImportSkillsDialogProps> = ({
                           opencode: false,
                           openclaw: false,
                           hermes: false,
+                          kimicode: false,
                         }
                       }
                       onToggle={(app, enabled) => {
@@ -1105,6 +1108,7 @@ const ImportSkillsDialog: React.FC<ImportSkillsDialogProps> = ({
                               opencode: false,
                               openclaw: false,
                               hermes: false,
+                              kimicode: false,
                             }),
                             [app]: enabled,
                           },

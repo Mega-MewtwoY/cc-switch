@@ -2042,7 +2042,9 @@ pub fn import_kimicode_providers_from_live(state: &AppState) -> Result<usize, Ap
                 Ok(Some(existing)) => {
                     // 官方 OAuth 供应商补齐展示元数据（旧版本导入的可能缺失）
                     let needs_meta_backfill = name == "managed:kimi-code"
-                        && (existing.website_url.is_none() || existing.icon.is_none());
+                        && (existing.website_url.is_none()
+                            || existing.icon.is_none()
+                            || existing.category.as_deref() != Some("official"));
                     if existing.settings_config != config_value || needs_meta_backfill {
                         let mut provider = existing;
                         provider.settings_config = config_value;
@@ -2052,6 +2054,9 @@ pub fn import_kimicode_providers_from_live(state: &AppState) -> Result<usize, Ap
                                 Some("https://www.kimi.com/code".to_string());
                             provider.icon = Some("kimicode".to_string());
                             provider.icon_color = Some("#4F46E5".to_string());
+                            // official 类别：前端隐藏连通检测按钮（OAuth 端点无
+                            // 可探测的 base_url），并参与代理接管拦截逻辑
+                            provider.category = Some("official".to_string());
                         }
                         if let Err(e) = state.db.save_provider("kimicode", &provider) {
                             log::warn!(
@@ -2082,6 +2087,8 @@ pub fn import_kimicode_providers_from_live(state: &AppState) -> Result<usize, Ap
             provider.website_url = Some("https://www.kimi.com/code".to_string());
             provider.icon = Some("kimicode".to_string());
             provider.icon_color = Some("#4F46E5".to_string());
+            // official 类别：前端隐藏连通检测按钮，并参与代理接管拦截逻辑
+            provider.category = Some("official".to_string());
         }
 
         if let Err(e) = state.db.save_provider("kimicode", &provider) {

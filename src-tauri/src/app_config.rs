@@ -19,6 +19,8 @@ pub struct McpApps {
     pub opencode: bool,
     #[serde(default)]
     pub hermes: bool,
+    #[serde(default)]
+    pub kimicode: bool,
 }
 
 impl McpApps {
@@ -32,7 +34,7 @@ impl McpApps {
             AppType::OpenCode => self.opencode,
             AppType::OpenClaw => false, // OpenClaw doesn't support MCP
             AppType::Hermes => self.hermes,
-            AppType::KimiCode => false, // Kimi Code MCP 同步暂未支持（Phase 1 仅 providers）
+            AppType::KimiCode => self.kimicode,
             AppType::ClaudeDesktop => false,
         }
     }
@@ -47,7 +49,7 @@ impl McpApps {
             AppType::OpenCode => self.opencode = enabled,
             AppType::OpenClaw => {} // OpenClaw doesn't support MCP, ignore
             AppType::Hermes => self.hermes = enabled,
-            AppType::KimiCode => {} // Kimi Code MCP 同步暂未支持，忽略
+            AppType::KimiCode => self.kimicode = enabled,
             AppType::ClaudeDesktop => {} // Claude Desktop 3P provider config doesn't support MCP here
         }
     }
@@ -73,6 +75,9 @@ impl McpApps {
         if self.hermes {
             apps.push(AppType::Hermes);
         }
+        if self.kimicode {
+            apps.push(AppType::KimiCode);
+        }
         apps
     }
 
@@ -84,6 +89,7 @@ impl McpApps {
             && !self.grokbuild
             && !self.opencode
             && !self.hermes
+            && !self.kimicode
     }
 }
 
@@ -102,6 +108,8 @@ pub struct SkillApps {
     pub opencode: bool,
     #[serde(default)]
     pub hermes: bool,
+    #[serde(default)]
+    pub kimicode: bool,
 }
 
 impl SkillApps {
@@ -114,7 +122,7 @@ impl SkillApps {
             AppType::GrokBuild => self.grokbuild,
             AppType::OpenCode => self.opencode,
             AppType::Hermes => self.hermes,
-            AppType::KimiCode => false, // Kimi Code Skills 同步暂未支持（Phase 1 仅 providers）
+            AppType::KimiCode => self.kimicode,
             AppType::OpenClaw => false, // OpenClaw doesn't support Skills
             AppType::ClaudeDesktop => false,
         }
@@ -129,7 +137,7 @@ impl SkillApps {
             AppType::GrokBuild => self.grokbuild = enabled,
             AppType::OpenCode => self.opencode = enabled,
             AppType::Hermes => self.hermes = enabled,
-            AppType::KimiCode => {} // Kimi Code Skills 同步暂未支持，忽略
+            AppType::KimiCode => self.kimicode = enabled,
             AppType::OpenClaw => {} // OpenClaw doesn't support Skills, ignore
             AppType::ClaudeDesktop => {} // Claude Desktop 3P profiles don't use CC Switch skill sync
         }
@@ -156,6 +164,9 @@ impl SkillApps {
         if self.hermes {
             apps.push(AppType::Hermes);
         }
+        if self.kimicode {
+            apps.push(AppType::KimiCode);
+        }
         apps
     }
 
@@ -167,6 +178,7 @@ impl SkillApps {
             && !self.grokbuild
             && !self.opencode
             && !self.hermes
+            && !self.kimicode
     }
 
     /// 仅启用指定应用（其他应用设为禁用）
@@ -310,7 +322,7 @@ pub struct McpRoot {
     /// Hermes MCP 配置（实际使用 config.yaml）
     #[serde(default, skip_serializing_if = "McpConfig::is_empty")]
     pub hermes: McpConfig,
-    /// Kimi Code MCP 配置（预留，实际使用 config.toml；同步逻辑暂未实现）
+    /// Kimi Code MCP 配置（实际使用 ~/.kimi-code/mcp.json）
     #[serde(default, skip_serializing_if = "McpConfig::is_empty")]
     pub kimicode: McpConfig,
 }

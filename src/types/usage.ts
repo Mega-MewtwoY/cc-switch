@@ -187,8 +187,16 @@ export interface UsageRangeSelection {
  * every dashboard query (see `folded_app_type_sql`).
  * `opencode` / `openclaw` / `hermes` have no proxy handler at all — they
  * appear only as managed apps elsewhere.
+ * `kimicode` likewise has no proxy handler; its rows come from session-log
+ * sync (wire.jsonl usage.record), same as `opencode`.
  */
-export type AppType = "claude" | "codex" | "gemini" | "grokbuild" | "opencode";
+export type AppType =
+  | "claude"
+  | "codex"
+  | "gemini"
+  | "grokbuild"
+  | "opencode"
+  | "kimicode";
 
 export type AppTypeFilter = "all" | AppType;
 
@@ -198,6 +206,7 @@ export const KNOWN_APP_TYPES: ReadonlyArray<AppType> = [
   "gemini",
   "grokbuild",
   "opencode",
+  "kimicode",
 ];
 
 /**

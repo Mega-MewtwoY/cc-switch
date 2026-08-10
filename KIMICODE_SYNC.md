@@ -30,6 +30,10 @@ cd src-tauri && cargo check && cargo test
 
 1. **核心逻辑都在新文件**，官方更新永远不会碰到：
    - `src-tauri/src/kimicode_config.rs`（TOML 读写核心）
+   - `src-tauri/src/kimicode_mcp.rs`（~/.kimi-code/mcp.json 读写）
+   - `src-tauri/src/mcp/kimicode.rs`（MCP 同步/导入）
+   - `src-tauri/src/services/session_usage_kimicode.rs`（wire.jsonl usage.record 用量同步）
+   - `src-tauri/src/session_manager/providers/kimicode.rs`（会话扫描/消息/删除）
    - `src/config/kimicodeProviderPresets.ts`（供应商预设）
 2. **对已有文件的修改全是"追加式"**：枚举加变体、match 加分支、数组加元素。
    即使官方在同一区域也有改动，git 大多能自动合并；手工解冲突时也只需
@@ -66,3 +70,30 @@ cd src-tauri && cargo check && cargo test
 3. **`ProviderService::current`**（`services/provider/mod.rs`）：
    KimiCode 是累加模式里唯一保留"当前供应商"语义的应用，
    该函数对 KimiCode 例外，不返回空串。
+
+## Phase 2 接入点（MCP / Skills / 用量 / 会话）
+
+以下均为追加式修改，上游新增 harness 时对照检查：
+
+- **数据库 schema v17**（`database/schema.rs`）：`mcp_servers` / `skills`
+  各加 `enabled_kimicode` 列，`migrate_v16_to_v17` 带 `table_exists` 守卫
+  （同 v14→v15 模式）；CREATE TABLE 同步更新。
+- **`app_config.rs`**：`McpApps` / `SkillApps` 加 `kimicode` 字段
+  （serde default，旧配置兼容）。
+- **MCP**：`dao/mcp.rs` SELECT/INSERT/column match；`services/mcp.rs`
+  同步/删除/导入分发臂 + upsert 的 prev_apps 取消勾选处理 +
+  `import_from_all_apps` 数组；前端 `McpFormModal` 复选框 +
+  `appConfig.tsx` 的 `SKILLS_APP_IDS`（`MCP_APP_IDS` 复用它）。
+- **Skills**：`dao/skills.rs` 全部 SQL；同步/扫描本身是通用的
+  （`AppType::all()` + `get_skill_dir`，Phase 1 已接目录）。
+- **用量**：`services/session_usage.rs` 的 `sync_all_unlocked` 加
+  Kimi Code 步骤；`usage_stats.rs` 的 provider 命名 CASE、
+  session/proxy 去重清单、cache_creation 容差清单；
+  前端 `types/usage.ts` 的 `AppType`/`KNOWN_APP_TYPES`、
+  `UsageDashboard`/`UsageHero` 的主题映射。
+  kimi 的 `inputOther` 是 fresh input（Anthropic 风格），
+  **不要**加入 `CACHE_INCLUSIVE_APP_TYPES`。
+- **会话**：`session_manager/mod.rs` 的 scan 线程组（8 元组）、
+  load_messages / delete / provider_roots 分发；
+  前端 `SessionManagerPage` 的 `ProviderFilter` + 下拉项。
+  会话 source_path 是**目录**（非文件），删除走 `remove_dir_all`。
