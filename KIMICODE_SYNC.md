@@ -1,0 +1,51 @@
+# Kimi Code Harness 维护指南
+
+本分支（`feat/kimicode`）在 CC Switch 上游基础上新增 Kimi Code CLI（kimi）支持。
+本文档说明如何在官方更新后同步，保证本改动不被覆盖。
+
+## 仓库结构
+
+- `origin` → 你的 fork（首次推送前请在 GitHub 上 fork farion1231/cc-switch，
+  然后执行 `git remote set-url origin git@github.com:<你的用户名>/cc-switch.git`）
+- `upstream` → 官方仓库 farion1231/cc-switch（只读跟踪）
+- `main` → 跟踪上游，不要直接在 main 上改动
+- `feat/kimicode` → 全部 kimicode 改动所在分支
+
+## 同步官方更新（推荐流程）
+
+```bash
+git checkout main
+git pull upstream main          # 或 git fetch upstream && git merge upstream/main
+git push origin main
+
+git checkout feat/kimicode
+git merge main                  # 或 git rebase main（历史更干净，但已推送的分支慎用）
+
+# 验证
+pnpm typecheck && pnpm test:unit
+cd src-tauri && cargo check && cargo test
+```
+
+## 为什么冲突会很少
+
+1. **核心逻辑都在新文件**，官方更新永远不会碰到：
+   - `src-tauri/src/kimicode_config.rs`（TOML 读写核心）
+   - `src/config/kimicodeProviderPresets.ts`（供应商预设）
+2. **对已有文件的修改全是"追加式"**：枚举加变体、match 加分支、数组加元素。
+   即使官方在同一区域也有改动，git 大多能自动合并；手工解冲突时也只需
+   "两边都保留"。
+3. **编译器是安全网**：上游若改了 `AppType` 相关接口，merge 后 `cargo check`
+   会直接列出需要补分支的位置（本项目刻意使用穷尽 match）。
+
+## 同步后必查清单
+
+- [ ] `cargo check` 无 `non-exhaustive patterns` 错误（新 AppType 分支被重构时最常见）
+- [ ] `cargo test` 全绿（重点：`kimicode_config::tests`）
+- [ ] `pnpm typecheck && pnpm test:unit` 全绿
+- [ ] 上游若新增了 harness（对比 `AppType` 变体数），参照其新分支检查 kimicode 是否也需要
+
+## 长期建议
+
+如果功能稳定，考虑向官方提 PR（先开 issue 说明意愿）。官方近几个版本持续
+合入新 harness（hermes、openclaw、grokbuild），接受度较高。合入上游后本指南
+即可作废，直接跟随官方版本。
