@@ -79,7 +79,10 @@ cd src-tauri && cargo check && cargo test
      对 `AppType::KimiCode` 豁免（有回归测试
      `kimicode_official_provider_resolves_nested_base_url`）。
    - `src/components/providers/ProviderCard.tsx`：onTest /
-     onConfigureUsage 的 official 判定均加 `appId === "kimicode"` 例外。
+     onConfigureUsage 的 official 判定均加 `appId === "kimicode"` 例外；
+     卡片用量查询（`useUsageQuery` 的 `!isOfficial` 门）与页脚渲染分支
+     （official 且无官方订阅模板时渲染 null）同样加 kimicode 例外，
+     否则官方供应商的用量不会显示在主页卡片上。
    上游若改这两处判定逻辑，解冲突时保留 kimicode 例外。
 
 ## Phase 2 接入点（MCP / Skills / 用量 / 会话）

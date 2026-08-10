@@ -245,7 +245,12 @@ export function ProviderCard({
     : 0;
 
   const { data: usage } = useUsageQuery(provider.id, appId, {
-    enabled: usageEnabled && !isOfficial && !isOfficialSubscriptionUsage,
+    // kimicode 例外：官方供应商（本地 OAuth 导入）也走通用用量查询
+    // （Coding Plan token_plan 模板），不像 claude 等走官方订阅专用路径
+    enabled:
+      usageEnabled &&
+      (!isOfficial || appId === "kimicode") &&
+      !isOfficialSubscriptionUsage,
     autoQueryInterval,
   });
 
@@ -502,7 +507,7 @@ export function ProviderCard({
                   inline={true}
                   isCurrent={isCurrent}
                 />
-              ) : isOfficial ? (
+              ) : isOfficial && appId !== "kimicode" ? (
                 officialSubscriptionEnabled ? (
                   <SubscriptionQuotaFooter
                     appId={appId}
