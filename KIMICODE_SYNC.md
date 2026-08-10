@@ -57,6 +57,8 @@ cd src-tauri && cargo check && cargo test
 1. **macOS 关窗行为**（`src-tauri/src/lib.rs` `CloseRequested`）：
    去掉了关闭时 `apply_tray_policy(handle, false)`，点叉只隐藏窗口、
    保留 Dock 图标与运行点，经 `RunEvent::Reopen` 唤回。
+   配套修改：单实例回调显示窗口时补 `apply_tray_policy(app, true)`，
+   否则静默启动隐藏的 Dock 图标永远不会恢复。
 2. **终端启动器抽取**（`src-tauri/src/commands/misc.rs`）：
    从 claude 启动路径中抽出了 `launch_macos_script_in_terminal` /
    `launch_linux_script_in_terminal` 公共函数。上游若改这两段
