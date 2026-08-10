@@ -365,6 +365,13 @@ pub fn run() {
                 {
                     linux_fix::nudge_main_window(window.clone());
                 }
+                #[cfg(target_os = "macos")]
+                {
+                    // 窗口重新显示时恢复 Dock 图标：静默启动会降级为 Accessory
+                    // （隐藏 Dock），若此处不恢复，用户关窗后看不到 Dock 运行
+                    // 指示点，会误以为应用已退出。
+                    tray::apply_tray_policy(app, true);
+                }
             }
         }));
     }
