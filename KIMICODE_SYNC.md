@@ -70,6 +70,17 @@ cd src-tauri && cargo check && cargo test
 3. **`ProviderService::current`**（`services/provider/mod.rs`）：
    KimiCode 是累加模式里唯一保留"当前供应商"语义的应用，
    该函数对 KimiCode 例外，不返回空串。
+4. **official 供应商的 KimiCode 例外**（检测联通 / 用量查询）：
+   上游对 `category == "official"` 的供应商隐藏检测与用量配置按钮、
+   且 `stream_check` 拒绝解析 base_url（封号保护）。KimiCode 的官方
+   供应商是自动导入的本地 OAuth 配置，base_url 在嵌套路径
+   `settings_config.provider.base_url`，需要保留检测与用量入口：
+   - `services/stream_check.rs` `resolve_base_url`：official 早退
+     对 `AppType::KimiCode` 豁免（有回归测试
+     `kimicode_official_provider_resolves_nested_base_url`）。
+   - `src/components/providers/ProviderCard.tsx`：onTest /
+     onConfigureUsage 的 official 判定均加 `appId === "kimicode"` 例外。
+   上游若改这两处判定逻辑，解冲突时保留 kimicode 例外。
 
 ## Phase 2 接入点（MCP / Skills / 用量 / 会话）
 

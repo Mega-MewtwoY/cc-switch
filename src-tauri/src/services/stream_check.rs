@@ -165,8 +165,13 @@ impl StreamCheckService {
     /// 官方供应商（`category == "official"`）base_url 故意留空（走客户端默认/OAuth 端点），
     /// 没有 cc-switch 能可靠探测的目标——这类供应商的连通检测按钮在前端已隐藏
     /// （见 `ProviderCard.tsx`），故此处对其提取失败直接报错即可，不做官方端点回退。
+    ///
+    /// 例外：Kimi Code 官方 OAuth 供应商在 live config 中始终携带显式 base_url
+    /// （`https://api.kimi.com/coding/v1`），有可探测目标，不走此短路。
     fn resolve_base_url(app_type: &AppType, provider: &Provider) -> Result<String, AppError> {
-        if provider.category.as_deref() == Some("official") {
+        if provider.category.as_deref() == Some("official")
+            && !matches!(app_type, AppType::KimiCode)
+        {
             return Err(AppError::Message(
                 "Official providers do not expose a reachability-check target".to_string(),
             ));
@@ -540,5 +545,25 @@ mod tests {
         official.id = crate::database::CODEX_OFFICIAL_PROVIDER_ID.to_string();
         official.category = Some("official".to_string());
         assert!(StreamCheckService::resolve_base_url(&AppType::Codex, &official).is_err());
+    }
+
+    #[test]
+    fn kimicode_official_provider_resolves_nested_base_url() {
+        // KimiCode 例外：官方供应商（自动导入）的 base_url 在嵌套路径
+        // settings_config.provider.base_url，official category 不阻止提取，
+        // 前端的检测/用量按钮对 kimicode 保持可用。
+        let mut official = make_provider(serde_json::json!({
+            "provider": { "type": "kimi", "base_url": "https://api.kimi.com/coding/v1" }
+        }));
+        official.category = Some("official".to_string());
+        assert_eq!(
+            StreamCheckService::resolve_base_url(&AppType::KimiCode, &official).unwrap(),
+            "https://api.kimi.com/coding/v1"
+        );
+
+        // 但 base_url 缺失时仍报错，不回退默认端点
+        let mut empty = make_provider(serde_json::json!({ "provider": { "type": "kimi" } }));
+        empty.category = Some("official".to_string());
+        assert!(StreamCheckService::resolve_base_url(&AppType::KimiCode, &empty).is_err());
     }
 }

@@ -575,12 +575,17 @@ export function ProviderCard({
                 // (category === "official") 一律隐藏：它们 base_url 故意留空、走客户端
                 // 默认/OAuth 端点，cc-switch 没有可靠的探测目标（尤其 Claude Desktop
                 // 官方是原生 1P 模式，根本不在请求路径上）。
-                onTest && provider.category !== "official"
+                // 例外：Kimi Code 官方在 live config 中始终携带显式 base_url，
+                // 有可探测目标，照常开放。
+                onTest &&
+                (provider.category !== "official" || appId === "kimicode")
                   ? () => onTest(provider)
                   : undefined
               }
               onConfigureUsage={
-                (isOfficial && !supportsOfficialSubscription) ||
+                (isOfficial &&
+                  !supportsOfficialSubscription &&
+                  appId !== "kimicode") ||
                 isCopilot ||
                 isCodexOauth ||
                 isXaiOauth
