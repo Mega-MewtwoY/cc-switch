@@ -284,6 +284,7 @@ export interface VisibleApps {
   opencode: boolean;
   openclaw: boolean;
   hermes: boolean;
+  kimicode: boolean;
 }
 
 // WebDAV 同步状态
@@ -403,6 +404,8 @@ export interface Settings {
   openclawConfigDir?: string;
   // 覆盖 Hermes 配置目录（可选）
   hermesConfigDir?: string;
+  // 覆盖 Kimi Code 配置目录（可选）
+  kimicodeConfigDir?: string;
 
   // ===== 当前供应商 ID（设备级）=====
   // 当前 Claude 供应商 ID（优先于数据库 is_current）
@@ -413,6 +416,8 @@ export interface Settings {
   currentProviderCodex?: string;
   // 当前 Gemini 供应商 ID（优先于数据库 is_current）
   currentProviderGemini?: string;
+  // 当前 Kimi Code 供应商 ID（优先于数据库 is_current）
+  currentProviderKimicode?: string;
 
   // ===== Skill 同步设置 =====
   // Skill 同步方式：auto（默认，优先 symlink）、symlink、copy
@@ -495,6 +500,7 @@ export interface McpApps {
   opencode: boolean;
   openclaw: boolean;
   hermes: boolean;
+  kimicode?: boolean;
 }
 
 // MCP 服务器条目（v3.7.0 统一结构）
@@ -734,4 +740,38 @@ export interface HermesMemoryLimits {
   user: number;
   memoryEnabled: boolean;
   userEnabled: boolean;
+}
+
+// ============================================================================
+// Kimi Code 专属配置
+// ============================================================================
+
+export type KimiCodeProviderType =
+  | "kimi"
+  | "anthropic"
+  | "openai"
+  | "openai_responses"
+  | "google-genai"
+  | "vertexai";
+
+export interface KimiCodeProviderSpec {
+  type: KimiCodeProviderType;
+  api_key?: string;
+  base_url?: string;
+  [key: string]: unknown;
+}
+
+export interface KimiCodeModel {
+  model: string;
+  max_context_size?: number;
+  capabilities?: string[];
+  display_name?: string;
+  [key: string]: unknown;
+}
+
+export interface KimiCodeProviderConfig {
+  provider: KimiCodeProviderSpec;
+  models: Record<string, KimiCodeModel>;
+  default_model?: string;
+  [key: string]: unknown;
 }

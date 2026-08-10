@@ -119,6 +119,7 @@ export const iconUrls: Record<string, string> = {
   fenno: _fenno,
   hermes: _hermes,
   huoshan: _huoshan,
+  kimicode: `<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" style="flex:none;line-height:1" viewBox="0 0 24 24" fill="none"><title>Kimi Code</title><path d="M4 6.5C4 5.11929 5.11929 4 6.5 4H17.5C18.8807 4 20 5.11929 20 6.5V17.5C20 18.8807 18.8807 20 17.5 20H6.5C5.11929 20 4 18.8807 4 17.5V6.5Z" fill="#4F46E5"/><path d="M8 8.5L12 12.5L8 16.5" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 16.5H16" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   nekocode: _nekocode,
   pateway: _pateway,
   pipellm: _pipellm,

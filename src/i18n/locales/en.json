@@ -773,6 +773,8 @@
     "openclawConfigDirDescription": "Override OpenClaw configuration directory (openclaw.json).",
     "hermesConfigDir": "Hermes Configuration Directory",
     "hermesConfigDirDescription": "Override Hermes configuration directory (config.yaml).",
+    "kimicodeConfigDir": "Kimi Code Configuration Directory",
+    "kimicodeConfigDirDescription": "Override Kimi Code configuration directory.",
     "browsePlaceholderClaude": "e.g., /home/<your-username>/.claude",
     "browsePlaceholderCodex": "e.g., /home/<your-username>/.codex",
     "browsePlaceholderGemini": "e.g., /home/<your-username>/.gemini",
@@ -780,6 +782,7 @@
     "browsePlaceholderOpencode": "e.g., /home/<your-username>/.config/opencode",
     "browsePlaceholderOpenclaw": "e.g., /home/<your-username>/.openclaw",
     "browsePlaceholderHermes": "e.g., /home/<your-username>/.hermes",
+    "browsePlaceholderKimicode": "e.g., /home/<your-username>/.config/kimicode",
     "browseDirectory": "Browse Directory",
     "resetDefault": "Reset to default directory (takes effect after saving)",
     "checkForUpdates": "Check for Updates",
@@ -890,7 +893,8 @@
     "grokbuild": "Grok Build",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "kimicode": "Kimi Code"
   },
   "appSwitcher": {
     "more": "More apps"
@@ -1073,7 +1077,10 @@
       "qiniu": "Qiniu",
       "openrouter": "OpenRouter",
       "deepseek": "DeepSeek",
-      "together": "Together AI"
+      "together": "Together AI",
+      "moonshotOfficial": "Moonshot Official",
+      "moonshotGlobal": "Moonshot Global",
+      "custom": "Custom"
     },
     "parameterConfig": "Parameter Config - {{name}} *",
     "mainModel": "Main Model (optional)",
@@ -2231,6 +2238,15 @@
       "openConfig": "Adjust limits in Hermes Web UI",
       "runtimeNote": "Changes apply on Hermes restart or new session."
     }
+  },
+  "kimicode": {
+    "providerKey": "Provider Key",
+    "providerKeyPlaceholder": "my-provider",
+    "providerKeyHint": "Unique identifier in config. Lowercase letters, numbers, and hyphens only.",
+    "providerKeyLockedHint": "This provider is in Kimi Code config; key is locked.",
+    "providerKeyRequired": "Provider key is required",
+    "providerKeyInvalid": "Provider key can only contain lowercase letters, numbers, and hyphens",
+    "providerKeyDuplicate": "This provider key already exists"
   },
   "env": {
     "warning": {

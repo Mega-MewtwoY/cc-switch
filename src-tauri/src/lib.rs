@@ -1592,6 +1592,9 @@ pub fn run() {
             commands::set_openclaw_env,
             commands::get_openclaw_tools,
             commands::set_openclaw_tools,
+            // Kimi Code specific
+            commands::import_kimicode_providers_from_live,
+            commands::get_kimicode_live_provider_ids,
             // Hermes specific
             commands::import_hermes_providers_from_live,
             commands::get_hermes_live_provider_ids,

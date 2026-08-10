@@ -238,6 +238,13 @@ export const getApiKeyFromConfig = (
       return typeof geminiKey === "string" ? geminiKey : "";
     }
 
+    // Kimi Code API Key
+    if (appType === "kimicode") {
+      const provider = config?.provider as Record<string, unknown> | undefined;
+      const key = provider?.api_key;
+      return typeof key === "string" ? key : "";
+    }
+
     // Codex API Key
     if (appType === "codex") {
       const codexKey = env.CODEX_API_KEY;
@@ -323,6 +330,11 @@ export const hasApiKeyField = (
       return Object.prototype.hasOwnProperty.call(env, "GEMINI_API_KEY");
     }
 
+    if (appType === "kimicode") {
+      const provider = config?.provider as Record<string, unknown> | undefined;
+      return Object.prototype.hasOwnProperty.call(provider ?? {}, "api_key");
+    }
+
     if (appType === "codex") {
       return Object.prototype.hasOwnProperty.call(env, "CODEX_API_KEY");
     }
@@ -371,6 +383,20 @@ export const setApiKeyInConfig = (
       } else {
         return jsonString;
       }
+      return JSON.stringify(config, null, 2);
+    }
+
+    // Kimi Code API Key
+    if (appType === "kimicode") {
+      const provider = (config.provider ?? {}) as Record<string, any>;
+      if ("api_key" in provider) {
+        provider.api_key = apiKey;
+      } else if (createIfMissing) {
+        provider.api_key = apiKey;
+      } else {
+        return jsonString;
+      }
+      config.provider = provider;
       return JSON.stringify(config, null, 2);
     }
 

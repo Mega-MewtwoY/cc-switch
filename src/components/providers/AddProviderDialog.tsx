@@ -51,6 +51,7 @@ export function AddProviderDialog({
     appId !== "opencode" &&
     appId !== "openclaw" &&
     appId !== "hermes" &&
+    appId !== "kimicode" &&
     appId !== "grokbuild" &&
     appId !== "claude-desktop";
   const [activeTab, setActiveTab] = useState<"app-specific" | "universal">(
@@ -158,9 +159,9 @@ export function AddProviderDialog({
           values.presetId === GROKBUILD_OFFICIAL_PROVIDER_ID;
       }
 
-      // OpenCode/OpenClaw: pass providerKey for ID generation
+      // OpenCode/OpenClaw/Hermes/Kimi Code: pass providerKey for ID generation
       if (
-        (appId === "opencode" || appId === "openclaw" || appId === "hermes") &&
+        (appId === "opencode" || appId === "openclaw" || appId === "hermes" || appId === "kimicode") &&
         values.providerKey
       ) {
         providerData.providerKey = values.providerKey;
@@ -286,6 +287,13 @@ export function AddProviderDialog({
         } else if (appId === "hermes") {
           if (parsedConfig.base_url) {
             addUrl(parsedConfig.base_url as string);
+          }
+        } else if (appId === "kimicode") {
+          const provider = parsedConfig.provider as
+            | Record<string, unknown>
+            | undefined;
+          if (provider?.base_url) {
+            addUrl(provider.base_url as string);
           }
         }
 

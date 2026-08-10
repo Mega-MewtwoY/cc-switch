@@ -773,6 +773,8 @@
     "openclawConfigDirDescription": "覆盖 OpenClaw 配置目录 (openclaw.json)。",
     "hermesConfigDir": "Hermes 配置目录",
     "hermesConfigDirDescription": "覆盖 Hermes 配置目录 (config.yaml)。",
+    "kimicodeConfigDir": "Kimi Code 配置目录",
+    "kimicodeConfigDirDescription": "覆盖 Kimi Code 配置目录。",
     "browsePlaceholderClaude": "例如：/home/<你的用户名>/.claude",
     "browsePlaceholderCodex": "例如：/home/<你的用户名>/.codex",
     "browsePlaceholderGemini": "例如：/home/<你的用户名>/.gemini",
@@ -780,6 +782,7 @@
     "browsePlaceholderOpencode": "例如：/home/<你的用户名>/.config/opencode",
     "browsePlaceholderOpenclaw": "例如：/home/<你的用户名>/.openclaw",
     "browsePlaceholderHermes": "例如：/home/<你的用户名>/.hermes",
+    "browsePlaceholderKimicode": "例如：/home/<你的用户名>/.config/kimicode",
     "browseDirectory": "浏览目录",
     "resetDefault": "恢复默认目录（需保存后生效）",
     "checkForUpdates": "检查更新",
@@ -890,7 +893,8 @@
     "grokbuild": "Grok Build",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "kimicode": "Kimi Code"
   },
   "appSwitcher": {
     "more": "更多应用"
@@ -1073,7 +1077,10 @@
       "qiniu": "七牛云",
       "openrouter": "OpenRouter",
       "deepseek": "DeepSeek",
-      "together": "Together AI"
+      "together": "Together AI",
+      "moonshotOfficial": "Moonshot 官方",
+      "moonshotGlobal": "Moonshot 国际站",
+      "custom": "自定义"
     },
     "parameterConfig": "参数配置 - {{name}} *",
     "mainModel": "主模型 (可选)",
@@ -2231,6 +2238,15 @@
       "openConfig": "在 Hermes Web UI 调整上限",
       "runtimeNote": "更改将在 Hermes 下次启动或新建会话时生效。"
     }
+  },
+  "kimicode": {
+    "providerKey": "供应商标识",
+    "providerKeyPlaceholder": "my-provider",
+    "providerKeyHint": "配置文件中的唯一标识符，只能使用小写字母、数字和连字符。",
+    "providerKeyLockedHint": "该供应商已添加到 Kimi Code 配置中，标识不可修改。",
+    "providerKeyRequired": "请填写供应商标识",
+    "providerKeyInvalid": "标识格式无效，只能使用小写字母、数字和连字符",
+    "providerKeyDuplicate": "此标识已被使用，请更换"
   },
   "env": {
     "warning": {

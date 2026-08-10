@@ -773,6 +773,8 @@
     "openclawConfigDirDescription": "覆寫 OpenClaw 設定目錄 (openclaw.json)。",
     "hermesConfigDir": "Hermes 設定目錄",
     "hermesConfigDirDescription": "覆寫 Hermes 設定目錄 (config.yaml)。",
+    "kimicodeConfigDir": "Kimi Code 設定目錄",
+    "kimicodeConfigDirDescription": "覆寫 Kimi Code 設定目錄。",
     "browsePlaceholderClaude": "例如：/home/<您的帳號>/.claude",
     "browsePlaceholderCodex": "例如：/home/<您的帳號>/.codex",
     "browsePlaceholderGemini": "例如：/home/<您的帳號>/.gemini",
@@ -780,6 +782,7 @@
     "browsePlaceholderOpencode": "例如：/home/<您的帳號>/.config/opencode",
     "browsePlaceholderOpenclaw": "例如：/home/<您的帳號>/.openclaw",
     "browsePlaceholderHermes": "例如：/home/<您的帳號>/.hermes",
+    "browsePlaceholderKimicode": "例如：/home/<您的帳號>/.config/kimicode",
     "browseDirectory": "瀏覽目錄",
     "resetDefault": "還原預設目錄（需儲存後生效）",
     "checkForUpdates": "檢查更新",
@@ -891,7 +894,8 @@
     "grokbuild": "Grok Build",
     "opencode": "OpenCode",
     "openclaw": "OpenClaw",
-    "hermes": "Hermes"
+    "hermes": "Hermes",
+    "kimicode": "Kimi Code"
   },
   "appSwitcher": {
     "more": "更多應用程式"
@@ -1074,7 +1078,10 @@
       "qiniu": "七牛雲",
       "openrouter": "OpenRouter",
       "deepseek": "DeepSeek",
-      "together": "Together AI"
+      "together": "Together AI",
+      "moonshotOfficial": "Moonshot 官方",
+      "moonshotGlobal": "Moonshot 國際站",
+      "custom": "自訂"
     },
     "parameterConfig": "參數設定 - {{name}} *",
     "mainModel": "主模型 (選填)",
@@ -2232,6 +2239,15 @@
       "openConfig": "在 Hermes Web UI 調整上限",
       "runtimeNote": "變更將在 Hermes 下次啟動或建立新工作階段時生效。"
     }
+  },
+  "kimicode": {
+    "providerKey": "供應商標識",
+    "providerKeyPlaceholder": "my-provider",
+    "providerKeyHint": "設定檔中的唯一識別碼，只能使用小寫字母、數字和連字號。",
+    "providerKeyLockedHint": "該供應商已新增至 Kimi Code 設定中，標識不可修改。",
+    "providerKeyRequired": "請填寫供應商標識",
+    "providerKeyInvalid": "標識格式無效，只能使用小寫字母、數字和連字號",
+    "providerKeyDuplicate": "此標識已被使用，請更換"
   },
   "env": {
     "warning": {
