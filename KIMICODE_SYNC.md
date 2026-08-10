@@ -49,3 +49,18 @@ cd src-tauri && cargo check && cargo test
 如果功能稳定，考虑向官方提 PR（先开 issue 说明意愿）。官方近几个版本持续
 合入新 harness（hermes、openclaw、grokbuild），接受度较高。合入上游后本指南
 即可作废，直接跟随官方版本。
+
+## 有意的行为分叉（合并上游时需留意）
+
+以下修改不是纯追加，而是改变了上游原有行为，merge 冲突时按本分支语义保留：
+
+1. **macOS 关窗行为**（`src-tauri/src/lib.rs` `CloseRequested`）：
+   去掉了关闭时 `apply_tray_policy(handle, false)`，点叉只隐藏窗口、
+   保留 Dock 图标与运行点，经 `RunEvent::Reopen` 唤回。
+2. **终端启动器抽取**（`src-tauri/src/commands/misc.rs`）：
+   从 claude 启动路径中抽出了 `launch_macos_script_in_terminal` /
+   `launch_linux_script_in_terminal` 公共函数。上游若改这两段
+   （终端分发/终端列表），解冲突时把上游改动套回抽取后的公共函数。
+3. **`ProviderService::current`**（`services/provider/mod.rs`）：
+   KimiCode 是累加模式里唯一保留"当前供应商"语义的应用，
+   该函数对 KimiCode 例外，不返回空串。
