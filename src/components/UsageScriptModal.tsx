@@ -297,6 +297,14 @@ const UsageScriptModal: React.FC<UsageScriptModalProps> = ({
             apiKey: options.apiKey,
             baseUrl: options.baseURL,
           };
+        } else if (appId === "kimicode") {
+          // Kimi Code: 凭据嵌在 provider.{base_url, api_key}（snake_case，对应 config.toml）
+          // 镜像后端 Provider::resolve_usage_credentials 的 KimiCode 分支
+          const p = (config as any).provider || {};
+          return {
+            apiKey: p.api_key,
+            baseUrl: p.base_url,
+          };
         }
         return { apiKey: undefined, baseUrl: undefined };
       } catch (error) {

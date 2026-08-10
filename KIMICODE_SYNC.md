@@ -102,9 +102,17 @@ cd src-tauri && cargo check && cargo test
   session/proxy 去重清单、cache_creation 容差清单；
   前端 `types/usage.ts` 的 `AppType`/`KNOWN_APP_TYPES`、
   `UsageDashboard`/`UsageHero` 的主题映射。
+  用量脚本（Coding Plan 等）：后端 `provider.rs`
+  `resolve_usage_credentials` 的 KimiCode 分支与前端
+  `UsageScriptModal.tsx` `getProviderCredentials` 的 kimicode
+  分支互为镜像，都读 `settings_config.provider.{base_url,api_key}`，
+  改动须两边同步（漏前端会导致测试报 Unknown coding plan provider）。
   kimi 的 `inputOther` 是 fresh input（Anthropic 风格），
   **不要**加入 `CACHE_INCLUSIVE_APP_TYPES`。
 - **会话**：`session_manager/mod.rs` 的 scan 线程组（8 元组）、
   load_messages / delete / provider_roots 分发；
-  前端 `SessionManagerPage` 的 `ProviderFilter` + 下拉项。
+  前端 `SessionManagerPage` 的 `ProviderFilter` + 下拉项，
+  `App.tsx` 的 `hasSessionSupport` 清单与 sessions 视图的
+  回退守卫（两处都要加 kimicode，漏掉回退守卫会导致
+  点开会话页立即被弹回 providers）。
   会话 source_path 是**目录**（非文件），删除走 `remove_dir_all`。
