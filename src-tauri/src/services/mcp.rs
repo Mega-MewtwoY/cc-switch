@@ -145,6 +145,10 @@ impl McpService {
             AppType::Hermes => {
                 mcp::sync_single_server_to_hermes(&Default::default(), &server.id, &server.server)?;
             }
+            AppType::KimiCode => {
+                // Kimi Code MCP sync is not implemented yet (Phase 1: providers only)
+                log::debug!("KimiCode MCP support is not implemented yet, skipping sync");
+            }
         }
         Ok(())
     }
@@ -180,6 +184,10 @@ impl McpService {
             }
             AppType::Hermes => {
                 mcp::remove_server_from_hermes(id)?;
+            }
+            AppType::KimiCode => {
+                // Kimi Code MCP sync is not implemented yet (Phase 1: providers only)
+                log::debug!("KimiCode MCP support is not implemented yet, skipping remove");
             }
         }
         Ok(())

@@ -17,6 +17,7 @@ mod gemini_mcp;
 mod grok_config;
 pub mod hermes_config;
 mod init_status;
+pub mod kimicode_config;
 mod lightweight;
 #[cfg(target_os = "linux")]
 mod linux_fix;
@@ -828,6 +829,13 @@ pub fn run() {
                 }
                 Ok(_) => log::debug!("○ No Hermes provider changes from live config"),
                 Err(e) => log::warn!("✗ Failed to import Hermes providers: {e}"),
+            }
+            match crate::services::provider::import_kimicode_providers_from_live(&app_state) {
+                Ok(count) if count > 0 => {
+                    log::info!("✓ Synced {count} KimiCode provider(s) from live config");
+                }
+                Ok(_) => log::debug!("○ No KimiCode provider changes from live config"),
+                Err(e) => log::warn!("✗ Failed to import KimiCode providers: {e}"),
             }
 
             // 2. OMO 配置导入（当数据库中无 OMO provider 时，从本地文件导入）

@@ -22,8 +22,8 @@ use crate::store::AppState;
 
 // Re-export sub-module functions for external access
 pub use live::{
-    import_default_config, import_hermes_providers_from_live, import_openclaw_providers_from_live,
-    import_opencode_providers_from_live, read_live_settings,
+    import_default_config, import_hermes_providers_from_live, import_kimicode_providers_from_live,
+    import_openclaw_providers_from_live, import_opencode_providers_from_live, read_live_settings,
     should_import_default_config_on_startup, sync_current_to_live,
     update_toml_common_config_snippet,
 };
@@ -38,8 +38,8 @@ pub(crate) use live::{
 
 // Internal re-exports
 use live::{
-    remove_hermes_provider_from_live, remove_openclaw_provider_from_live,
-    remove_opencode_provider_from_live, write_gemini_live,
+    remove_hermes_provider_from_live, remove_kimicode_provider_from_live,
+    remove_openclaw_provider_from_live, remove_opencode_provider_from_live, write_gemini_live,
 };
 use usage::validate_usage_script;
 
@@ -2870,6 +2870,7 @@ impl ProviderService {
                     AppType::OpenCode => remove_opencode_provider_from_live(id)?,
                     AppType::OpenClaw => remove_openclaw_provider_from_live(id)?,
                     AppType::Hermes => remove_hermes_provider_from_live(id)?,
+                    AppType::KimiCode => remove_kimicode_provider_from_live(id)?,
                     _ => {}
                 }
             }
@@ -2934,6 +2935,9 @@ impl ProviderService {
             }
             AppType::Hermes => {
                 remove_hermes_provider_from_live(id)?;
+            }
+            AppType::KimiCode => {
+                remove_kimicode_provider_from_live(id)?;
             }
             _ => {
                 return Err(AppError::Message(format!(
@@ -3145,6 +3149,19 @@ impl ProviderService {
         // Sync to live (write_gemini_live handles security flag internally for Gemini)
         write_live_with_common_config(state.db.as_ref(), &app_type, provider)?;
 
+        // Kimi Code：切换 = 供应商已写入 + 移动 default_model 指针 + 记录设备级当前供应商。
+        // additive 语义下不动数据库 is_current，只写本地 settings 供 UI 高亮当前项。
+        if matches!(app_type, AppType::KimiCode) {
+            let config: crate::provider::KimiCodeProviderConfig =
+                serde_json::from_value(provider.settings_config.clone()).map_err(|e| {
+                    AppError::Config(format!("KimiCode 供应商 '{id}' 配置格式无效: {e}"))
+                })?;
+            if let Some(alias) = &config.default_model {
+                crate::kimicode_config::set_default_model_for(id, alias)?;
+            }
+            crate::settings::set_current_provider(&app_type, Some(id))?;
+        }
+
         // A material-less official Codex provider gets a config-only live
         // write, which can leave the previous third-party key in
         // ~/.codex/auth.json and strand the user on a 401 with no login
@@ -3203,6 +3220,7 @@ impl ProviderService {
                     AppType::OpenCode => remove_opencode_provider_from_live(&provider.id),
                     AppType::OpenClaw => remove_openclaw_provider_from_live(&provider.id),
                     AppType::Hermes => remove_hermes_provider_from_live(&provider.id),
+                    AppType::KimiCode => remove_kimicode_provider_from_live(&provider.id),
                     _ => Ok(()),
                 };
 
@@ -3489,6 +3507,7 @@ impl ProviderService {
             AppType::OpenCode => Self::extract_opencode_common_config(&provider.settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(&provider.settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
+            AppType::KimiCode => Ok(String::new()), // KimiCode doesn't use common config snippets
         }
     }
 
@@ -3506,6 +3525,7 @@ impl ProviderService {
             AppType::OpenCode => Self::extract_opencode_common_config(settings_config),
             AppType::OpenClaw => Self::extract_openclaw_common_config(settings_config),
             AppType::Hermes => Ok(String::new()), // Hermes doesn't use common config snippets
+            AppType::KimiCode => Ok(String::new()), // KimiCode doesn't use common config snippets
         }
     }
 
@@ -4271,6 +4291,16 @@ impl ProviderService {
                     ));
                 }
             }
+            AppType::KimiCode => {
+                // Kimi Code uses config structure: { provider: {...}, models: {...}, default_model }
+                if !provider.settings_config.is_object() {
+                    return Err(AppError::localized(
+                        "provider.kimicode.settings.not_object",
+                        "Kimi Code 配置必须是 JSON 对象",
+                        "Kimi Code configuration must be a JSON object",
+                    ));
+                }
+            }
         }
 
         // Validate and clean UsageScript configuration (common for all app types)
@@ -4493,6 +4523,30 @@ impl ProviderService {
                 let base_url = provider
                     .settings_config
                     .get("baseUrl")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+
+                Ok((api_key, base_url))
+            }
+            AppType::KimiCode => {
+                // Kimi Code 凭据嵌套在 provider 下（snake_case）
+                let spec = provider.settings_config.get("provider");
+                let api_key = spec
+                    .and_then(|p| p.get("api_key"))
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .ok_or_else(|| {
+                        AppError::localized(
+                            "provider.kimicode.api_key.missing",
+                            "缺少 API Key",
+                            "API key is missing",
+                        )
+                    })?
+                    .to_string();
+
+                let base_url = spec
+                    .and_then(|p| p.get("base_url"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();

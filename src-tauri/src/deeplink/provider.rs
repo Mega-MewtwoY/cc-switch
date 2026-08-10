@@ -152,6 +152,7 @@ pub(crate) fn build_provider_from_request(
         AppType::OpenCode => build_opencode_settings(request),
         AppType::OpenClaw => build_additive_app_settings(request),
         AppType::Hermes => build_hermes_settings(request),
+        AppType::KimiCode => build_kimicode_settings(request),
     };
 
     // Build usage script configuration if provided
@@ -578,6 +579,37 @@ fn build_hermes_settings(request: &DeepLinkImportRequest) -> serde_json::Value {
             "models".to_string(),
             json!([{ "id": model, "name": model }]),
         );
+    }
+
+    json!(config)
+}
+
+/// Build Kimi Code provider settings（对应 config.toml 的 TOML 结构）。
+///
+/// Kimi Code 的供应商嵌套在 `provider` 下（snake_case），模型在 `models` 映射中，
+/// `default_model` 指向默认模型别名。deeplink 没有字段携带协议类型，
+/// 默认 `openai`（Chat Completions 兼容），用户可在导入后通过 UI 调整。
+fn build_kimicode_settings(request: &DeepLinkImportRequest) -> serde_json::Value {
+    let endpoint = get_primary_endpoint(request);
+
+    let mut provider = serde_json::Map::new();
+    provider.insert("type".to_string(), json!("openai"));
+    if !endpoint.is_empty() {
+        provider.insert("base_url".to_string(), json!(endpoint));
+    }
+    if let Some(api_key) = &request.api_key {
+        provider.insert("api_key".to_string(), json!(api_key));
+    }
+
+    let mut config = serde_json::Map::new();
+    config.insert("provider".to_string(), json!(provider));
+
+    if let Some(model) = &request.model {
+        config.insert(
+            "models".to_string(),
+            json!({ model: { "model": model } }),
+        );
+        config.insert("default_model".to_string(), json!(model));
     }
 
     json!(config)

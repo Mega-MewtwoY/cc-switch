@@ -215,6 +215,14 @@ impl Provider {
                     str_at(options.and_then(|o| o.get("apiKey"))),
                 )
             }
+            // Kimi Code nests credentials under `provider`（snake_case，与 config.toml 一致）。
+            AppType::KimiCode => {
+                let provider = settings.get("provider");
+                (
+                    str_at(provider.and_then(|p| p.get("base_url"))),
+                    str_at(provider.and_then(|p| p.get("api_key"))),
+                )
+            }
             // Claude and Claude Desktop both use the Anthropic-style env map, keeping
             // the OpenRouter/Google key fallbacks the JS-script path relies on.
             // Listed explicitly (not `_`) so a new AppType fails to compile here.
@@ -990,6 +998,104 @@ pub struct OpenCodeModelLimit {
     /// 输出 token 限制
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output: Option<u64>,
+}
+
+// ============================================================================
+// Kimi Code 供应商配置结构
+// ============================================================================
+
+/// Kimi Code 供应商的 settings_config 结构
+///
+/// Kimi Code 使用 TOML 配置（~/.kimi-code/config.toml），多供应商共存，
+/// 通过顶层 `default_model` 指向当前模型别名。cc-switch 侧每个供应商
+/// 持久化为如下 JSON，写入 live 配置时转换为 TOML 表：
+/// ```json
+/// {
+///   "provider": { "type": "openai", "api_key": "sk-xxx", "base_url": "https://..." },
+///   "models": { "kimi-k2.6": { "model": "kimi-k2.6", "max_context_size": 262144 } },
+///   "default_model": "kimi-k2.6"
+/// }
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KimiCodeProviderConfig {
+    /// 供应商定义（type/api_key/base_url 等）
+    pub provider: KimiCodeProviderSpec,
+
+    /// 模型定义映射（key 为模型别名，写入 live 时变为 `<provider-id>/<别名>`）
+    #[serde(default)]
+    pub models: HashMap<String, KimiCodeModel>,
+
+    /// 该供应商的默认模型别名（切换为当前供应商时用于设置 default_model）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default_model: Option<String>,
+}
+
+impl Default for KimiCodeProviderConfig {
+    fn default() -> Self {
+        Self {
+            provider: KimiCodeProviderSpec::default(),
+            models: HashMap::new(),
+            default_model: None,
+        }
+    }
+}
+
+/// Kimi Code 供应商定义（对应 config.toml 的 `[providers."<id>"]` 表）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KimiCodeProviderSpec {
+    /// 供应商类型：kimi / anthropic / openai / openai_responses / google-genai / vertexai
+    #[serde(rename = "type", default = "default_kimicode_provider_type")]
+    pub provider_type: String,
+
+    /// API 密钥（OAuth 管理的官方供应商为空）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+
+    /// API 基础 URL
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+
+    /// 额外字段（env、oauth 等），写入 live 时原样透传
+    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, Value>,
+}
+
+fn default_kimicode_provider_type() -> String {
+    "openai".to_string()
+}
+
+impl Default for KimiCodeProviderSpec {
+    fn default() -> Self {
+        Self {
+            provider_type: default_kimicode_provider_type(),
+            api_key: None,
+            base_url: None,
+            extra: HashMap::new(),
+        }
+    }
+}
+
+/// Kimi Code 模型定义（对应 config.toml 的 `[models."<别名>"]` 表）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KimiCodeModel {
+    /// 真实模型名（必填）
+    pub model: String,
+
+    /// 上下文窗口大小
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_context_size: Option<u64>,
+
+    /// 能力列表（thinking / always_thinking / image_in / video_in / tool_use）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<Vec<String>>,
+
+    /// 显示名称
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+
+    /// 额外字段（support_efforts、default_effort 等），原样透传
+    #[serde(flatten, default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra: HashMap<String, Value>,
 }
 
 #[cfg(test)]

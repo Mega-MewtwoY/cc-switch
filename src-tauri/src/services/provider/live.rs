@@ -186,6 +186,8 @@ pub(crate) fn provider_exists_in_live_config(
             .map(|providers| providers.contains_key(provider_id)),
         AppType::Hermes => crate::hermes_config::get_providers()
             .map(|providers| providers.contains_key(provider_id)),
+        AppType::KimiCode => crate::kimicode_config::get_providers()
+            .map(|providers| providers.contains_key(provider_id)),
         _ => Ok(false),
     }
 }
@@ -527,6 +529,7 @@ fn settings_contain_common_config(app_type: &AppType, settings: &Value, snippet:
         | AppType::OpenCode
         | AppType::OpenClaw
         | AppType::Hermes
+        | AppType::KimiCode
         | AppType::ClaudeDesktop => false,
     }
 }
@@ -601,6 +604,7 @@ pub(crate) fn remove_common_config_from_settings(
         | AppType::OpenCode
         | AppType::OpenClaw
         | AppType::Hermes
+        | AppType::KimiCode
         | AppType::ClaudeDesktop => Ok(settings.clone()),
     }
 }
@@ -660,6 +664,7 @@ fn apply_common_config_to_settings(
         | AppType::OpenCode
         | AppType::OpenClaw
         | AppType::Hermes
+        | AppType::KimiCode
         | AppType::ClaudeDesktop => Ok(settings.clone()),
     }
 }
@@ -1162,6 +1167,20 @@ pub(crate) fn write_live_snapshot(app_type: &AppType, provider: &Provider) -> Re
             crate::hermes_config::set_provider(&provider.id, provider.settings_config.clone())?;
             log::debug!("Hermes provider '{}' written to live config", provider.id);
         }
+        AppType::KimiCode => {
+            // Kimi Code uses additive mode - 展开为 config.toml 的 providers/models 表
+            use crate::provider::KimiCodeProviderConfig;
+
+            let config: KimiCodeProviderConfig =
+                serde_json::from_value(provider.settings_config.clone()).map_err(|e| {
+                    AppError::Config(format!(
+                        "KimiCode 供应商 '{}' 配置格式无效: {e}",
+                        provider.id
+                    ))
+                })?;
+            crate::kimicode_config::set_provider(&provider.id, &config)?;
+            log::debug!("KimiCode provider '{}' written to live config", provider.id);
+        }
     }
     Ok(())
 }
@@ -1417,6 +1436,18 @@ pub fn read_live_settings(app_type: AppType) -> Result<Value, AppError> {
             let config = crate::hermes_config::yaml_to_json(&yaml_config)?;
             Ok(config)
         }
+        AppType::KimiCode => {
+            let config_path = crate::kimicode_config::get_kimicode_config_path();
+            if !config_path.exists() {
+                return Err(AppError::localized(
+                    "kimicode.config.missing",
+                    "Kimi Code 配置文件不存在",
+                    "Kimi Code configuration file not found",
+                ));
+            }
+            let doc = crate::kimicode_config::read_kimicode_config()?;
+            Ok(crate::kimicode_config::document_to_json(&doc))
+        }
     }
 }
 
@@ -1525,8 +1556,8 @@ pub fn import_default_config(state: &AppState, app_type: AppType) -> Result<bool
                 "config": config_obj
             })
         }
-        // OpenCode, OpenClaw and Hermes use additive mode and are handled by early return above
-        AppType::OpenCode | AppType::OpenClaw | AppType::Hermes => {
+        // OpenCode, OpenClaw, Hermes and KimiCode use additive mode and are handled by early return above
+        AppType::OpenCode | AppType::OpenClaw | AppType::Hermes | AppType::KimiCode => {
             unreachable!("additive mode apps are handled by early return")
         }
     };
@@ -1969,6 +2000,114 @@ pub fn remove_openclaw_provider_from_live(provider_id: &str) -> Result<(), AppEr
 
     openclaw_config::remove_provider(provider_id)?;
     log::info!("OpenClaw provider '{provider_id}' removed from live config");
+
+    Ok(())
+}
+
+/// Import all providers from Kimi Code live config to database
+///
+/// This imports existing providers from ~/.kimi-code/config.toml
+/// (including the official OAuth provider `managed:kimi-code`) into the
+/// CC Switch database. Each provider found will be added with is_current
+/// set to false; the current provider is derived from `default_model`
+/// separately via `resolve_current_provider_id`.
+pub fn import_kimicode_providers_from_live(state: &AppState) -> Result<usize, AppError> {
+    use crate::kimicode_config;
+
+    let providers = kimicode_config::get_providers()?;
+    if providers.is_empty() {
+        return Ok(0);
+    }
+
+    let mut imported = 0;
+    let mut updated = 0;
+    let existing_ids = state.db.get_provider_ids("kimicode")?;
+
+    for (name, config) in providers {
+        if name.trim().is_empty() {
+            log::warn!("Skipping KimiCode provider with empty name");
+            continue;
+        }
+
+        let config_value = match serde_json::to_value(&config) {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!("Failed to serialize KimiCode provider '{name}': {e}");
+                continue;
+            }
+        };
+
+        if existing_ids.contains(&name) {
+            match state.db.get_provider_by_id(&name, "kimicode") {
+                Ok(Some(existing)) => {
+                    if existing.settings_config != config_value {
+                        let mut provider = existing;
+                        provider.settings_config = config_value;
+                        if let Err(e) = state.db.save_provider("kimicode", &provider) {
+                            log::warn!(
+                                "Failed to update KimiCode provider '{name}' from live config: {e}"
+                            );
+                        } else {
+                            updated += 1;
+                            log::info!("Updated KimiCode provider '{name}' from live config");
+                        }
+                    }
+                }
+                Ok(None) => {
+                    log::warn!("KimiCode provider '{name}' disappeared while importing live config")
+                }
+                Err(e) => log::warn!("Failed to look up KimiCode provider '{name}': {e}"),
+            }
+            continue;
+        }
+
+        let mut provider = Provider::with_id(name.clone(), name.clone(), config_value, None);
+        provider.meta = Some(crate::provider::ProviderMeta {
+            live_config_managed: Some(true),
+            ..Default::default()
+        });
+
+        if let Err(e) = state.db.save_provider("kimicode", &provider) {
+            log::warn!("Failed to import KimiCode provider '{name}': {e}");
+            continue;
+        }
+
+        imported += 1;
+        log::info!("Imported KimiCode provider '{name}' from live config");
+    }
+
+    // 从 default_model 指针恢复「当前供应商」到本地 settings
+    if crate::settings::get_current_provider(&crate::app_config::AppType::KimiCode).is_none() {
+        if let Ok(Some(current_id)) = kimicode_config::resolve_current_provider_id() {
+            if state.db.get_provider_by_id(&current_id, "kimicode")?.is_some() {
+                let _ = crate::settings::set_current_provider(
+                    &crate::app_config::AppType::KimiCode,
+                    Some(&current_id),
+                );
+            }
+        }
+    }
+
+    Ok(imported + updated)
+}
+
+/// Remove a Kimi Code provider from live config
+///
+/// This removes a specific provider from ~/.kimi-code/config.toml
+/// (providers table + its model tables + dangling default_model)
+/// without affecting other providers in the file.
+pub fn remove_kimicode_provider_from_live(provider_id: &str) -> Result<(), AppError> {
+    use crate::kimicode_config;
+
+    if !kimicode_config::get_kimicode_dir().exists() {
+        log::debug!(
+            "KimiCode config directory doesn't exist, skipping removal of '{provider_id}'"
+        );
+        return Ok(());
+    }
+
+    kimicode_config::remove_provider(provider_id)?;
+    log::info!("KimiCode provider '{provider_id}' removed from live config");
 
     Ok(())
 }
