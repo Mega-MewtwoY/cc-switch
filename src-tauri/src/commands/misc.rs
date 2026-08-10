@@ -3339,6 +3339,20 @@ pub async fn open_provider_terminal(
     let app_type = AppType::from_str(&app).map_err(|e| e.to_string())?;
     let launch_cwd = resolve_launch_cwd(cwd)?;
 
+    // KimiCode：kimi CLI 直接读取 ~/.kimi-code/config.toml（切换时已同步），
+    // 无需注入任何环境变量，打开终端进入所选目录并启动 kimi 即可。
+    if app_type == AppType::KimiCode {
+        // 仍校验提供商存在，避免对无效 ID 打开终端
+        let providers = ProviderService::list(state.inner(), app_type.clone())
+            .map_err(|e| format!("获取提供商列表失败: {e}"))?;
+        if !providers.contains_key(&providerId) {
+            return Err(format!("提供商 {providerId} 不存在"));
+        }
+        launch_kimicode_terminal(launch_cwd.as_deref())
+            .map_err(|e| format!("启动终端失败: {e}"))?;
+        return Ok(true);
+    }
+
     // 获取提供商配置
     let providers = ProviderService::list(state.inner(), app_type.clone())
         .map_err(|e| format!("获取提供商列表失败: {e}"))?;
@@ -3509,9 +3523,6 @@ fn write_claude_config(
 fn launch_macos_terminal(config_file: &std::path::Path, cwd: Option<&Path>) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
 
-    let preferred = crate::settings::get_preferred_terminal();
-    let terminal = preferred.as_deref().unwrap_or("terminal");
-
     let shell = get_user_shell();
     let exec_line = build_exec_line(&shell, cwd);
     let final_cd_command = build_final_shell_cd_command(&shell, cwd);
@@ -3545,17 +3556,27 @@ echo "{config_path}"
     std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o755))
         .map_err(|e| format!("设置脚本权限失败: {e}"))?;
 
+    launch_macos_script_in_terminal(&script_file)
+}
+
+/// macOS: 将启动脚本交给用户首选终端执行，失败时回退 Terminal.app。
+/// 供 claude / kimicode 等启动器共用。
+#[cfg(target_os = "macos")]
+fn launch_macos_script_in_terminal(script_file: &std::path::Path) -> Result<(), String> {
+    let preferred = crate::settings::get_preferred_terminal();
+    let terminal = preferred.as_deref().unwrap_or("terminal");
+
     // Try the preferred terminal first, fall back to Terminal.app if it fails
     // Note: Kitty doesn't need the -e flag, others do
     let result = match terminal {
-        "iterm2" => launch_macos_iterm2(&script_file),
-        "warp" => launch_macos_warp(&script_file),
-        "alacritty" => launch_macos_open_app("Alacritty", &script_file, true),
-        "kitty" => launch_macos_open_app("kitty", &script_file, false),
-        "ghostty" => launch_macos_ghostty(&script_file),
-        "wezterm" => launch_macos_open_app("WezTerm", &script_file, true),
-        "kaku" => launch_macos_open_app("Kaku", &script_file, true),
-        _ => launch_macos_terminal_app(&script_file),
+        "iterm2" => launch_macos_iterm2(script_file),
+        "warp" => launch_macos_warp(script_file),
+        "alacritty" => launch_macos_open_app("Alacritty", script_file, true),
+        "kitty" => launch_macos_open_app("kitty", script_file, false),
+        "ghostty" => launch_macos_ghostty(script_file),
+        "wezterm" => launch_macos_open_app("WezTerm", script_file, true),
+        "kaku" => launch_macos_open_app("Kaku", script_file, true),
+        _ => launch_macos_terminal_app(script_file),
     };
 
     // If preferred terminal fails and it's not the default, try Terminal.app as fallback
@@ -3565,10 +3586,64 @@ echo "{config_path}"
             terminal,
             result.as_ref().err()
         );
-        return launch_macos_terminal_app(&script_file);
+        return launch_macos_terminal_app(script_file);
     }
 
     result
+}
+
+/// 构建 kimi 命令行：通过用户 shell 的交互模式执行，确保 GUI 启动的终端
+/// 也加载用户 PATH（kimi 默认装在 ~/.kimi-code/bin）。
+#[cfg_attr(target_os = "windows", allow(dead_code))]
+fn build_kimicode_command_line(shell: &str, cwd: Option<&Path>) -> String {
+    let command = cwd
+        .map(|dir| format!("cd {} && kimi", shell_single_quote(&dir.to_string_lossy())))
+        .unwrap_or_else(|| "kimi".to_string());
+
+    format!(
+        "{} {} {}",
+        shell_single_quote(shell),
+        provider_command_flag_for_shell(shell),
+        shell_single_quote(&command)
+    )
+}
+
+/// KimiCode: 打开终端进入所选目录并启动 kimi，退出后回到交互 shell。
+/// kimi CLI 直接读取 ~/.kimi-code/config.toml，无需临时配置文件。
+#[cfg(target_os = "macos")]
+fn launch_kimicode_terminal(cwd: Option<&Path>) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let shell = get_user_shell();
+    let exec_line = build_exec_line(&shell, cwd);
+    let final_cd_command = build_final_shell_cd_command(&shell, cwd);
+
+    let temp_dir = std::env::temp_dir();
+    let script_file = temp_dir.join(format!(
+        "cc_switch_kimi_launcher_{}.sh",
+        std::process::id()
+    ));
+    let kimi_command = build_kimicode_command_line(&shell, cwd);
+
+    let script_content = format!(
+        r#"#!/usr/bin/env sh
+trap 'rm -f "{script_file}"' EXIT
+{kimi_command}
+{final_cd_command}
+{exec_line}
+"#,
+        script_file = script_file.display(),
+        kimi_command = kimi_command,
+        final_cd_command = final_cd_command,
+        exec_line = exec_line,
+    );
+
+    std::fs::write(&script_file, &script_content).map_err(|e| format!("写入启动脚本失败: {e}"))?;
+
+    std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("设置脚本权限失败: {e}"))?;
+
+    launch_macos_script_in_terminal(&script_file)
 }
 
 /// Escape a value as an AppleScript string literal.
@@ -3828,25 +3903,10 @@ fn launch_macos_warp(script_file: &std::path::Path) -> Result<(), String> {
 #[cfg(target_os = "linux")]
 fn launch_linux_terminal(config_file: &std::path::Path, cwd: Option<&Path>) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
-    use std::process::Command;
-
-    let preferred = crate::settings::get_preferred_terminal();
 
     let shell = get_user_shell();
     let exec_line = build_exec_line(&shell, cwd);
     let final_cd_command = build_final_shell_cd_command(&shell, cwd);
-
-    // Default terminal list with their arguments
-    let default_terminals = [
-        ("gnome-terminal", vec!["--"]),
-        ("konsole", vec!["-e"]),
-        ("xfce4-terminal", vec!["-e"]),
-        ("mate-terminal", vec!["--"]),
-        ("lxterminal", vec!["-e"]),
-        ("alacritty", vec!["-e"]),
-        ("kitty", vec!["-e"]),
-        ("ghostty", vec!["-e"]),
-    ];
 
     // Create temp script file
     let temp_dir = std::env::temp_dir();
@@ -3874,6 +3934,33 @@ echo "{config_path}"
 
     std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o755))
         .map_err(|e| format!("设置脚本权限失败: {e}"))?;
+
+    let result = launch_linux_script_in_terminal(&script_file);
+    if result.is_err() {
+        let _ = std::fs::remove_file(config_file);
+    }
+    result
+}
+
+/// Linux: 将启动脚本交给可用终端执行（首选终端优先，其余按默认列表回退）。
+/// 供 claude / kimicode 等启动器共用；失败时由本函数负责删除脚本文件。
+#[cfg(target_os = "linux")]
+fn launch_linux_script_in_terminal(script_file: &std::path::Path) -> Result<(), String> {
+    use std::process::Command;
+
+    let preferred = crate::settings::get_preferred_terminal();
+
+    // Default terminal list with their arguments
+    let default_terminals = [
+        ("gnome-terminal", vec!["--"]),
+        ("konsole", vec!["-e"]),
+        ("xfce4-terminal", vec!["-e"]),
+        ("mate-terminal", vec!["--"]),
+        ("lxterminal", vec!["-e"]),
+        ("alacritty", vec!["-e"]),
+        ("kitty", vec!["-e"]),
+        ("ghostty", vec!["-e"]),
+    ];
 
     // Build terminal list: preferred terminal first (if specified), then defaults
     let terminals_to_try: Vec<(&str, Vec<&str>)> = if let Some(ref pref) = preferred {
@@ -3925,9 +4012,46 @@ echo "{config_path}"
     }
 
     // Clean up on failure
-    let _ = std::fs::remove_file(&script_file);
-    let _ = std::fs::remove_file(config_file);
+    let _ = std::fs::remove_file(script_file);
     Err(last_error)
+}
+
+/// KimiCode: 打开终端进入所选目录并启动 kimi，退出后回到交互 shell。
+/// kimi CLI 直接读取 ~/.kimi-code/config.toml，无需临时配置文件。
+#[cfg(target_os = "linux")]
+fn launch_kimicode_terminal(cwd: Option<&Path>) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let shell = get_user_shell();
+    let exec_line = build_exec_line(&shell, cwd);
+    let final_cd_command = build_final_shell_cd_command(&shell, cwd);
+
+    let temp_dir = std::env::temp_dir();
+    let script_file = temp_dir.join(format!(
+        "cc_switch_kimi_launcher_{}.sh",
+        std::process::id()
+    ));
+    let kimi_command = build_kimicode_command_line(&shell, cwd);
+
+    let script_content = format!(
+        r#"#!/usr/bin/env sh
+trap 'rm -f "{script_file}"' EXIT
+{kimi_command}
+{final_cd_command}
+{exec_line}
+"#,
+        script_file = script_file.display(),
+        kimi_command = kimi_command,
+        final_cd_command = final_cd_command,
+        exec_line = exec_line,
+    );
+
+    std::fs::write(&script_file, &script_content).map_err(|e| format!("写入启动脚本失败: {e}"))?;
+
+    std::fs::set_permissions(&script_file, std::fs::Permissions::from_mode(0o755))
+        .map_err(|e| format!("设置脚本权限失败: {e}"))?;
+
+    launch_linux_script_in_terminal(&script_file)
 }
 
 /// Check if a command exists using `which`
@@ -3996,6 +4120,59 @@ del \"%~f0\" >nul 2>&1
     }
 
     result
+}
+
+/// KimiCode: 打开终端进入所选目录并启动 kimi。
+/// kimi CLI 直接读取 ~/.kimi-code/config.toml，无需临时配置文件。
+#[cfg(target_os = "windows")]
+fn launch_kimicode_terminal(cwd: Option<&Path>) -> Result<(), String> {
+    let preferred = crate::settings::get_preferred_terminal();
+    let terminal = preferred.as_deref().unwrap_or("cmd");
+
+    let temp_dir = std::env::temp_dir();
+    let bat_file = temp_dir.join(format!(
+        "cc_switch_kimi_{}.bat",
+        std::process::id()
+    ));
+    let cwd_command = build_windows_cwd_command(cwd);
+
+    let content = format!(
+        "@echo off
+{cwd_command}kimi
+del \"%~f0\" >nul 2>&1
+",
+        cwd_command = cwd_command,
+    );
+
+    std::fs::write(&bat_file, &content).map_err(|e| format!("写入批处理文件失败: {e}"))?;
+
+    let bat_path = bat_file.to_string_lossy();
+    let ps_cmd = format!("& '{}'", bat_path);
+
+    let result = match terminal {
+        "powershell" => run_windows_start_command(
+            &["powershell", "-NoExit", "-Command", &ps_cmd],
+            "PowerShell",
+        ),
+        "wt" => run_windows_start_command(&["wt", "cmd", "/K", &bat_path], "Windows Terminal"),
+        _ => run_windows_start_command(&["cmd", "/K", &bat_path], "cmd"),
+    };
+
+    if result.is_err() && terminal != "cmd" {
+        log::warn!(
+            "首选终端 {} 启动失败，回退到 cmd: {:?}",
+            terminal,
+            result.as_ref().err()
+        );
+        return run_windows_start_command(&["cmd", "/K", &bat_path], "cmd");
+    }
+
+    result
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+fn launch_kimicode_terminal(_cwd: Option<&Path>) -> Result<(), String> {
+    Err("不支持的操作系统".to_string())
 }
 
 #[cfg_attr(windows, allow(dead_code))]

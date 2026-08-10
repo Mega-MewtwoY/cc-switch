@@ -2538,9 +2538,11 @@ impl ProviderService {
     /// 这确保了云同步场景下多设备可以独立选择供应商，且返回的 ID 一定有效。
     ///
     /// 对于累加模式应用（OpenCode, OpenClaw），不存在"当前供应商"概念，直接返回空字符串。
+    /// 例外：KimiCode 有当前供应商概念（config.toml 的 default_model 指针 +
+    /// 设备级 settings 记录），走通用解析。
     pub fn current(state: &AppState, app_type: AppType) -> Result<String, AppError> {
         // Additive mode apps have no "current" provider concept
-        if app_type.is_additive_mode() {
+        if app_type.is_additive_mode() && !matches!(app_type, AppType::KimiCode) {
             return Ok(String::new());
         }
         crate::settings::get_effective_current_provider(&state.db, &app_type)

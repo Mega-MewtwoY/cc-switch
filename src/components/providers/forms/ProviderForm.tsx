@@ -1215,7 +1215,9 @@ function ProviderFormFull({
         toast.error(t("kimicode.providerKeyRequired"));
         return;
       }
-      if (!keyPattern.test(kimicodeForm.kimicodeProviderKey)) {
+      // live 导入的供应商（如官方 managed:kimi-code）标识被锁定且必须原样保留
+      // （含冒号），跳过正则校验；仅对新建供应商 enforce keyPattern。
+      if (!isProviderKeyLocked && !keyPattern.test(kimicodeForm.kimicodeProviderKey)) {
         toast.error(t("kimicode.providerKeyInvalid"));
         return;
       }

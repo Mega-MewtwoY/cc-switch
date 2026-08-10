@@ -2040,9 +2040,19 @@ pub fn import_kimicode_providers_from_live(state: &AppState) -> Result<usize, Ap
         if existing_ids.contains(&name) {
             match state.db.get_provider_by_id(&name, "kimicode") {
                 Ok(Some(existing)) => {
-                    if existing.settings_config != config_value {
+                    // 官方 OAuth 供应商补齐展示元数据（旧版本导入的可能缺失）
+                    let needs_meta_backfill = name == "managed:kimi-code"
+                        && (existing.website_url.is_none() || existing.icon.is_none());
+                    if existing.settings_config != config_value || needs_meta_backfill {
                         let mut provider = existing;
                         provider.settings_config = config_value;
+                        if needs_meta_backfill {
+                            provider.name = "Kimi Code（官方）".to_string();
+                            provider.website_url =
+                                Some("https://www.kimi.com/code".to_string());
+                            provider.icon = Some("kimicode".to_string());
+                            provider.icon_color = Some("#4F46E5".to_string());
+                        }
                         if let Err(e) = state.db.save_provider("kimicode", &provider) {
                             log::warn!(
                                 "Failed to update KimiCode provider '{name}' from live config: {e}"
@@ -2066,6 +2076,13 @@ pub fn import_kimicode_providers_from_live(state: &AppState) -> Result<usize, Ap
             live_config_managed: Some(true),
             ..Default::default()
         });
+        // 官方 OAuth 供应商（managed:kimi-code）：补充展示名、官网链接与图标
+        if name == "managed:kimi-code" {
+            provider.name = "Kimi Code（官方）".to_string();
+            provider.website_url = Some("https://www.kimi.com/code".to_string());
+            provider.icon = Some("kimicode".to_string());
+            provider.icon_color = Some("#4F46E5".to_string());
+        }
 
         if let Err(e) = state.db.save_provider("kimicode", &provider) {
             log::warn!("Failed to import KimiCode provider '{name}': {e}");

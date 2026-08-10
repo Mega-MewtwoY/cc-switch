@@ -394,10 +394,9 @@ pub fn run() {
                     {
                         let _ = window.set_skip_taskbar(true);
                     }
-                    #[cfg(target_os = "macos")]
-                    {
-                        tray::apply_tray_policy(window.app_handle(), false);
-                    }
+                    // macOS：保留 Dock 图标与运行指示点（不降级为 Accessory），
+                    // 点叉只隐藏窗口；点击 Dock 图标经 RunEvent::Reopen 唤回，
+                    // 符合 mac 应用习惯（原行为会连 Dock 图标一起隐藏）。
                 } else {
                     api.prevent_close();
                     window.app_handle().exit(0);
