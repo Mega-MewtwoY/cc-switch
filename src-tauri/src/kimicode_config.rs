@@ -57,6 +57,9 @@ pub fn get_kimicode_config_path() -> PathBuf {
 /// 官方供应商的 config.toml 里 `api_key` 为空——OAuth 令牌由 kimi CLI
 /// 自己持有并刷新，CC Switch 只在需要直接调官方 API（如套餐用量查询）时
 /// 从这里借用。文件缺失/损坏/令牌为空时返回 None，由调用方给出引导文案。
+///
+/// 注意：本函数不做过期检查与续期；调用方应优先使用
+/// [`load_or_refresh_oauth_access_token`]。
 pub fn load_oauth_access_token() -> Option<String> {
     load_oauth_access_token_from(&get_kimicode_dir().join("credentials").join("kimi-code.json"))
 }
@@ -69,6 +72,123 @@ fn load_oauth_access_token_from(path: &Path) -> Option<String> {
         .as_str()
         .filter(|s| !s.is_empty())
         .map(str::to_string)
+}
+
+// ─── OAuth 自动续期 ───────────────────────────────────────────────
+//
+// 实测：kimi OAuth access_token 寿命仅 15 分钟（expires_in=900），
+// 且只有 kimi CLI 运行时才会刷新。CLI 不在前台时令牌过期，
+// CC Switch 的用量查询就会 401。因此这里实现 refresh_token 续期：
+// 端点与公开 client_id 取自 kimi CLI 二进制（OAuth 设备码流程的
+// 公开客户端，非机密）。
+
+/// OAuth 令牌端点（kimi CLI 的 oauthHost + /api/oauth/token）
+pub const KIMI_OAUTH_TOKEN_URL: &str = "https://auth.kimi.com/api/oauth/token";
+/// kimi CLI 内嵌的公开 OAuth client_id（设备码流程，无 client_secret）
+pub const KIMI_OAUTH_CLIENT_ID: &str = "17e5f671-d194-4dfb-9706-5516cb48c098";
+/// 距过期不足该秒数即触发续期
+const OAUTH_REFRESH_SKEW_SECS: i64 = 60;
+
+fn oauth_credentials_path() -> PathBuf {
+    get_kimicode_dir().join("credentials").join("kimi-code.json")
+}
+
+fn now_epoch_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+fn oauth_needs_refresh(expires_at: i64, now: i64) -> bool {
+    expires_at - now <= OAUTH_REFRESH_SKEW_SECS
+}
+
+/// 读取凭据并按需续期，返回可用的 access_token。
+///
+/// - 令牌有效期充足 → 直接返回
+/// - 临近/已经过期 → 用 refresh_token 续期，成功后原子写回凭据文件
+///   （保留 scope 等其他字段；refresh_token 可能轮换，一并更新）
+/// - 写回前重读文件：若期间被 kimi CLI 刷新过（内容变化），
+///   改用文件里的新令牌，避免覆盖掉 CLI 的轮换结果
+/// - 续期失败但旧令牌尚未过期 → 返回旧令牌碰碰运气；
+///   彻底不可用 → None（调用方引导重新登录）
+pub async fn load_or_refresh_oauth_access_token() -> Option<String> {
+    load_or_refresh_oauth_access_token_from(&oauth_credentials_path(), KIMI_OAUTH_TOKEN_URL).await
+}
+
+async fn load_or_refresh_oauth_access_token_from(
+    path: &Path,
+    token_url: &str,
+) -> Option<String> {
+    let original_content = std::fs::read_to_string(path).ok()?;
+    let mut value: Value = serde_json::from_str(&original_content).ok()?;
+    let access_token = value.get("access_token")?.as_str()?.to_string();
+    let expires_at = value.get("expires_at").and_then(Value::as_i64).unwrap_or(0);
+    let now = now_epoch_secs();
+
+    if !access_token.is_empty() && !oauth_needs_refresh(expires_at, now) {
+        return Some(access_token);
+    }
+
+    let refresh_token = value.get("refresh_token")?.as_str()?.to_string();
+    if refresh_token.is_empty() {
+        return None;
+    }
+
+    let resp = crate::proxy::http_client::get()
+        .post(token_url)
+        .header("Accept", "application/json")
+        .form(&[
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token.as_str()),
+            ("client_id", KIMI_OAUTH_CLIENT_ID),
+        ])
+        .timeout(std::time::Duration::from_secs(15))
+        .send()
+        .await;
+
+    let body: Value = match resp {
+        Ok(r) if r.status().is_success() => r.json().await.ok()?,
+        // 续期失败：旧令牌若名义上还没过期，先返回它（网络抖动时兜底）
+        _ if !access_token.is_empty() && expires_at > now => return Some(access_token),
+        _ => return None,
+    };
+    let new_access = body.get("access_token")?.as_str()?.to_string();
+
+    // 并发守护：kimi CLI 可能在我们等待响应期间自行刷新并写盘。
+    // 文件内容已变化时以文件为准（CLI 的轮换结果更新），不覆盖。
+    let current_content = std::fs::read_to_string(path).unwrap_or_default();
+    if current_content != original_content {
+        if let Ok(current) = serde_json::from_str::<Value>(&current_content) {
+            if let Some(token) = current.get("access_token").and_then(Value::as_str) {
+                if !token.is_empty() {
+                    return Some(token.to_string());
+                }
+            }
+        }
+    }
+
+    if let Some(rt) = body.get("refresh_token").and_then(Value::as_str) {
+        value["refresh_token"] = Value::String(rt.to_string());
+    }
+    let expires_in = body.get("expires_in").and_then(Value::as_i64).unwrap_or(900);
+    value["access_token"] = Value::String(new_access.clone());
+    value["expires_in"] = Value::from(expires_in);
+    value["expires_at"] = Value::from(now_epoch_secs() + expires_in);
+
+    // 原子写回：先写临时文件（0600）再 rename
+    let tmp = path.with_extension("json.cc-switch-tmp");
+    let serialized = serde_json::to_string(&value).ok()?;
+    std::fs::write(&tmp, serialized).ok()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
+    }
+    std::fs::rename(&tmp, path).ok()?;
+
+    Some(new_access)
 }
 
 /// 读取 config.toml 为可编辑文档；文件不存在时返回空文档。
@@ -615,5 +735,17 @@ enabled = true
         let invalid = temp.path().join("invalid.json");
         std::fs::write(&invalid, "not json").expect("write");
         assert_eq!(load_oauth_access_token_from(&invalid), None);
+    }
+
+    #[test]
+    fn oauth_needs_refresh_only_within_skew() {
+        let now = 1_000_000;
+        // 有效期充足（> 60s skew）→ 不续期
+        assert!(!oauth_needs_refresh(now + 3600, now));
+        assert!(!oauth_needs_refresh(now + OAUTH_REFRESH_SKEW_SECS + 1, now));
+        // 临界、已过期、缺 expires_at（0）→ 续期
+        assert!(oauth_needs_refresh(now + OAUTH_REFRESH_SKEW_SECS, now));
+        assert!(oauth_needs_refresh(now - 1, now));
+        assert!(oauth_needs_refresh(0, now));
     }
 }

@@ -112,9 +112,12 @@ cd src-tauri && cargo check && cargo test
   改动须两边同步（漏前端会导致测试报 Unknown coding plan provider）。
   OAuth 令牌：官方供应商 `provider.api_key` 为空，令牌由 kimi CLI
   存在 `<kimi_dir>/credentials/kimi-code.json`；
-  `kimicode_config::load_oauth_access_token` 读取，
+  `kimicode_config::load_or_refresh_oauth_access_token` 读取并按需
+  续期（access_token 寿命仅 15 分钟，kimi CLI 不在前台时不会刷新；
+  端点 `https://auth.kimi.com/api/oauth/token` + 公开 client_id，
+  续期成功原子写回凭据文件，写回前重读防覆盖 CLI 的轮换）；
   `coding_plan::get_coding_plan_quota` 的 Kimi 分支在 api_key
-  为空时回退到该令牌（前端测试与后台轮询共用此路径）。
+  为空时调用该函数（前端测试与后台轮询共用此路径）。
   kimi 的 `inputOther` 是 fresh input（Anthropic 风格），
   **不要**加入 `CACHE_INCLUSIVE_APP_TYPES`。
 - **会话**：`session_manager/mod.rs` 的 scan 线程组（8 元组）、
