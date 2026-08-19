@@ -27,6 +27,7 @@ pub fn prompt_file_path(app: &AppType) -> Result<PathBuf, AppError> {
         AppType::OpenClaw => get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
         AppType::KimiCode => crate::kimicode_config::get_kimicode_dir(),
+        AppType::Pi => crate::pi_config::get_pi_agent_dir()?,
         AppType::ClaudeDesktop => unreachable!("handled above"),
     };
 
@@ -38,25 +39,11 @@ pub fn prompt_file_path(app: &AppType) -> Result<PathBuf, AppError> {
             "AGENTS.md"
         }
         AppType::Hermes => "SOUL.md",
+        AppType::Pi => "AGENTS.md",
         AppType::ClaudeDesktop => unreachable!("handled above"),
     };
 
     Ok(base_dir.join(filename))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn hermes_prompt_file_uses_soul_md() {
-        let path = prompt_file_path(&AppType::Hermes).expect("Hermes prompt path");
-
-        assert_eq!(
-            path.file_name().and_then(|name| name.to_str()),
-            Some("SOUL.md")
-        );
-    }
 }
 
 fn get_base_dir_with_fallback(
@@ -74,4 +61,29 @@ fn get_base_dir_with_fallback(
                 format!("Cannot determine {fallback_dir} config directory: user home not found"),
             )
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hermes_prompt_file_uses_soul_md() {
+        let path = prompt_file_path(&AppType::Hermes).expect("Hermes prompt path");
+
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("SOUL.md")
+        );
+    }
+
+    #[test]
+    fn pi_prompt_file_uses_agents_md() {
+        let path = prompt_file_path(&AppType::Pi).expect("Pi prompt path");
+
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("AGENTS.md")
+        );
+    }
 }

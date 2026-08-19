@@ -142,6 +142,10 @@ impl ConfigService {
                 // Kimi Code uses additive mode, no live sync needed
                 // Kimi Code providers are managed directly in config.toml
             }
+            AppType::Pi => {
+                // Pi owns its shared models/settings documents; this legacy
+                // single-provider live-sync path must not rewrite them.
+            }
         }
 
         Ok(())

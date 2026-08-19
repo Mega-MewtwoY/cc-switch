@@ -187,8 +187,8 @@ export interface UsageRangeSelection {
  * every dashboard query (see `folded_app_type_sql`).
  * `opencode` / `openclaw` / `hermes` have no proxy handler at all — they
  * appear only as managed apps elsewhere.
- * `kimicode` likewise has no proxy handler; its rows come from session-log
- * sync (wire.jsonl usage.record), same as `opencode`.
+ * `kimicode` and `pi` likewise have no proxy handler; their rows come from
+ * session-log sync (e.g. wire.jsonl usage.record), same as `opencode`.
  */
 export type AppType =
   | "claude"
@@ -196,7 +196,8 @@ export type AppType =
   | "gemini"
   | "grokbuild"
   | "opencode"
-  | "kimicode";
+  | "kimicode"
+  | "pi";
 
 export type AppTypeFilter = "all" | AppType;
 
@@ -207,6 +208,7 @@ export const KNOWN_APP_TYPES: ReadonlyArray<AppType> = [
   "grokbuild",
   "opencode",
   "kimicode",
+  "pi",
 ];
 
 /**
@@ -226,6 +228,27 @@ export const CACHE_INCLUSIVE_APP_TYPES: ReadonlySet<string> = new Set([
   "gemini",
   "grokbuild",
 ]);
+
+// Pi sessions can mix Anthropic and OpenAI APIs, but the dashboard aggregates
+// only by app type. Treat cache-write coverage as partial without changing
+// Pi's fresh-input token semantics.
+const PARTIAL_CACHE_WRITE_APP_TYPES: ReadonlySet<string> = new Set(["pi"]);
+
+export type CacheWriteAvailability = "ok" | "partial" | "na";
+
+export function getCacheWriteAvailability(
+  appTypes: readonly string[],
+): CacheWriteAvailability {
+  if (appTypes.length === 0) return "ok";
+  const unavailable = appTypes.filter((appType) =>
+    CACHE_INCLUSIVE_APP_TYPES.has(appType),
+  ).length;
+  if (unavailable === appTypes.length) return "na";
+  const partial = appTypes.some((appType) =>
+    PARTIAL_CACHE_WRITE_APP_TYPES.has(appType),
+  );
+  return unavailable === 0 && !partial ? "ok" : "partial";
+}
 
 /** Subset of request-log fields needed to derive cache-normalized input. */
 export interface CacheNormalizableLog {

@@ -144,6 +144,17 @@ pub async fn get_config_status(
 
             Ok(ConfigStatus { exists, path })
         }
+        AppType::Pi => {
+            let config_path = crate::pi_config::get_pi_models_path().map_err(|e| e.to_string())?;
+            let path = crate::pi_config::get_pi_agent_dir()
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .to_string();
+            Ok(ConfigStatus {
+                exists: config_path.exists(),
+                path,
+            })
+        }
     }
 }
 
@@ -166,6 +177,7 @@ pub async fn get_config_dir(app: String) -> Result<String, String> {
         AppType::OpenClaw => crate::openclaw_config::get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
         AppType::KimiCode => crate::kimicode_config::get_kimicode_dir(),
+        AppType::Pi => crate::pi_config::get_pi_agent_dir().map_err(|e| e.to_string())?,
     };
 
     Ok(dir.to_string_lossy().to_string())
@@ -185,6 +197,7 @@ pub async fn open_config_folder(handle: AppHandle, app: String) -> Result<bool, 
         AppType::OpenClaw => crate::openclaw_config::get_openclaw_dir(),
         AppType::Hermes => crate::hermes_config::get_hermes_dir(),
         AppType::KimiCode => crate::kimicode_config::get_kimicode_dir(),
+        AppType::Pi => crate::pi_config::get_pi_agent_dir().map_err(|e| e.to_string())?,
     };
 
     if !config_dir.exists() {

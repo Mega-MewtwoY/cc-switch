@@ -4,7 +4,11 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { providersApi, settingsApi } from "@/lib/api";
 import { syncCurrentProvidersLiveSafe } from "@/utils/postChangeSync";
-import { useSettingsQuery, useSaveSettingsMutation } from "@/lib/query";
+import {
+  invalidatePiDirectoryCaches,
+  useSettingsQuery,
+  useSaveSettingsMutation,
+} from "@/lib/query";
 import type { Settings } from "@/types";
 import { useSettingsForm, type SettingsFormState } from "./useSettingsForm";
 import {
@@ -115,6 +119,7 @@ export function useSettings(): UseSettingsResult {
       openclaw: sanitizeDir(data?.openclawConfigDir),
       hermes: sanitizeDir(data?.hermesConfigDir),
       kimicode: sanitizeDir(data?.kimicodeConfigDir),
+      pi: sanitizeDir(data?.piConfigDir),
     });
     setRequiresRestart(false);
   }, [
@@ -200,6 +205,7 @@ export function useSettings(): UseSettingsResult {
         const sanitizedKimicodeDir = sanitizeDir(
           mergedSettings.kimicodeConfigDir,
         );
+        const sanitizedPiDir = sanitizeDir(mergedSettings.piConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
           s3Sync: _ignoredS3Sync,
@@ -216,6 +222,7 @@ export function useSettings(): UseSettingsResult {
           openclawConfigDir: sanitizedOpenclawDir,
           hermesConfigDir: sanitizedHermesDir,
           kimicodeConfigDir: sanitizedKimicodeDir,
+          piConfigDir: sanitizedPiDir,
           language: mergedSettings.language,
         };
 
@@ -339,6 +346,7 @@ export function useSettings(): UseSettingsResult {
         const sanitizedKimicodeDir = sanitizeDir(
           mergedSettings.kimicodeConfigDir,
         );
+        const sanitizedPiDir = sanitizeDir(mergedSettings.piConfigDir);
         const previousAppDir = initialAppConfigDir;
         const previousClaudeDir = sanitizeDir(data?.claudeConfigDir);
         const previousCodexDir = sanitizeDir(data?.codexConfigDir);
@@ -348,6 +356,7 @@ export function useSettings(): UseSettingsResult {
         const previousOpenclawDir = sanitizeDir(data?.openclawConfigDir);
         const previousHermesDir = sanitizeDir(data?.hermesConfigDir);
         const previousKimicodeDir = sanitizeDir(data?.kimicodeConfigDir);
+        const previousPiDir = sanitizeDir(data?.piConfigDir);
         const {
           webdavSync: _ignoredWebdavSync,
           s3Sync: _ignoredS3Sync,
@@ -364,6 +373,7 @@ export function useSettings(): UseSettingsResult {
           openclawConfigDir: sanitizedOpenclawDir,
           hermesConfigDir: sanitizedHermesDir,
           kimicodeConfigDir: sanitizedKimicodeDir,
+          piConfigDir: sanitizedPiDir,
           language: mergedSettings.language,
         };
 
@@ -443,7 +453,7 @@ export function useSettings(): UseSettingsResult {
           console.warn("[useSettings] Failed to refresh tray menu", error);
         }
 
-        // 如果 Claude/Codex/Gemini/OpenCode/OpenClaw 的目录覆盖发生变化，则立即将"当前使用的供应商"写回对应应用的 live 配置
+        // 任一 app 的目录覆盖发生变化后，立即把当前状态投影到新的 live 目录。
         // 如果插件同步已经执行过 syncCurrentProvidersLiveSafe，则跳过避免重复
         const claudeDirChanged = sanitizedClaudeDir !== previousClaudeDir;
         const codexDirChanged = sanitizedCodexDir !== previousCodexDir;
@@ -453,6 +463,7 @@ export function useSettings(): UseSettingsResult {
         const openclawDirChanged = sanitizedOpenclawDir !== previousOpenclawDir;
         const hermesDirChanged = sanitizedHermesDir !== previousHermesDir;
         const kimicodeDirChanged = sanitizedKimicodeDir !== previousKimicodeDir;
+        const piDirChanged = sanitizedPiDir !== previousPiDir;
         if (
           !pluginSynced &&
           (claudeDirChanged ||
@@ -471,6 +482,9 @@ export function useSettings(): UseSettingsResult {
               syncResult.error,
             );
           }
+        }
+        if (piDirChanged) {
+          await invalidatePiDirectoryCaches(queryClient);
         }
 
         const appDirChanged = sanitizedAppDir !== (previousAppDir ?? undefined);

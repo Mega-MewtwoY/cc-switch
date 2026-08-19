@@ -87,11 +87,17 @@ cd src-tauri && cargo check && cargo test
 
 ## Phase 2 接入点（MCP / Skills / 用量 / 会话）
 
-以下均为追加式修改，上游新增 harness 时对照检查：
+以下均为追加式修改，上游新增 harness 时对照检查。
+注意：上游 v3.20.0 起新增了 Pi harness（同为 additive 模式；无 MCP、
+无 current provider、prompts 走 SQLite）。代码中大量位置是 `pi` 分支与
+`kimicode` 分支并列出现，解冲突时通常"两边都保留"。
 
-- **数据库 schema v17**（`database/schema.rs`）：`mcp_servers` / `skills`
-  各加 `enabled_kimicode` 列，`migrate_v16_to_v17` 带 `table_exists` 守卫
-  （同 v14→v15 模式）；CREATE TABLE 同步更新。
+- **数据库 schema v18**（`database/schema.rs`）：`mcp_servers` / `skills`
+  各加 `enabled_kimicode` 列。上游 v3.20.0 已占用 v17（session_usage_dedup
+  去重账本），故本迁移编号为 `migrate_v17_to_v18`，带 `table_exists` 守卫
+  （同 v14→v15 模式）；CREATE TABLE 同步更新。若上游今后再次占用同一版本
+  号，按同样方式处理：保留上游版本号的迁移，把 kimicode 列迁移顺延一位
+  （两步操作均幂等，任意先后顺序的旧库都能安全升级）。
 - **`app_config.rs`**：`McpApps` / `SkillApps` 加 `kimicode` 字段
   （serde default，旧配置兼容）。
 - **MCP**：`dao/mcp.rs` SELECT/INSERT/column match；`services/mcp.rs`
@@ -120,7 +126,8 @@ cd src-tauri && cargo check && cargo test
   为空时调用该函数（前端测试与后台轮询共用此路径）。
   kimi 的 `inputOther` 是 fresh input（Anthropic 风格），
   **不要**加入 `CACHE_INCLUSIVE_APP_TYPES`。
-- **会话**：`session_manager/mod.rs` 的 scan 线程组（8 元组）、
+- **会话**：`session_manager/mod.rs` 的 scan 线程组（9 元组，
+  kimicode=h8 / pi=h9，join 与 sessions.extend 同步增减）、
   load_messages / delete / provider_roots 分发；
   前端 `SessionManagerPage` 的 `ProviderFilter` + 下拉项，
   `App.tsx` 的 `hasSessionSupport` 清单与 sessions 视图的

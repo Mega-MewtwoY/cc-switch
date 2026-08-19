@@ -155,6 +155,7 @@ impl McpService {
                     &server.server,
                 )?;
             }
+            AppType::Pi => {}
         }
         Ok(())
     }
@@ -194,6 +195,7 @@ impl McpService {
             AppType::KimiCode => {
                 mcp::remove_server_from_kimicode(id)?;
             }
+            AppType::Pi => {}
         }
         Ok(())
     }
@@ -238,7 +240,10 @@ impl McpService {
         servers: &IndexMap<String, McpServer>,
         app: &AppType,
     ) -> Result<(), AppError> {
-        if matches!(app, AppType::OpenClaw | AppType::ClaudeDesktop) {
+        if matches!(
+            app,
+            AppType::OpenClaw | AppType::ClaudeDesktop | AppType::Pi
+        ) {
             return Ok(());
         }
 
