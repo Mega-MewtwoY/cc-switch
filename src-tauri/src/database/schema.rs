@@ -2234,6 +2234,17 @@ impl Database {
                 "0.044",
                 "0",
             ),
+            // deepseek-v4-flash-vision-exp 与 V4 Flash 完全同价（官方定价页）。
+            // 按人民币峰时价录入（CNY / 百万 tokens）：缓存未命中输入 ¥3、输出 ¥9、
+            // 缓存命中 ¥0.10；空闲时段半价不取，与上方「统一录高峰档」的约定一致
+            (
+                "deepseek-v4-flash-vision-exp",
+                "Deepseek V4 Flash Vision",
+                "3",
+                "9",
+                "0.1",
+                "0",
+            ),
             // Kimi (月之暗面)
             (
                 "kimi-k2-thinking",
@@ -2322,6 +2333,12 @@ impl Database {
             ("glm-5.2", "GLM-5.2", "1.4", "4.4", "0.26", "0"),
             ("glm-5-turbo", "GLM-5-Turbo", "1.2", "4", "0.24", "0"),
             ("glm-5v-turbo", "GLM-5V-Turbo", "1.2", "4", "0.24", "0"),
+            // GLM-5.3 系列按 bigmodel.cn 官方页人民币 list 价录入（CNY / 百万 tokens，
+            // 与上方 USD 口径的旧行不同，勿混算）：
+            //   glm-5.3       与 GLM-5.2 同价：输入 ¥8 / 输出 ¥28 / 缓存命中 ¥2
+            //   glm-5.3-flash 折扣前挂牌价 ¥0.8 / ¥2.8 / ¥0.23（限时折扣低至半价，取折扣前）
+            ("glm-5.3", "GLM-5.3", "8", "28", "2", "0"),
+            ("glm-5.3-flash", "GLM-5.3 Flash", "0.8", "2.8", "0.23", "0"),
             // MiMo (小米)
             (
                 "mimo-v2-flash",
